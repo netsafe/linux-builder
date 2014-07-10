@@ -208,14 +208,15 @@ make && make install clean
 cd ../openssl
 export CC="/usr/bin/gcc-trunk -mtune=native -m64 "
 ./Configure --prefix=/usr --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared linux-x86_64
-make & make install clean
+make && make install clean
 unset CC
 #libevent
 cd ../libevent
 ./configure --prefix=/usr --with-pic CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
 make -j4 && make install clean
 #tor
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib64"
 cd ../tor
-./configure --prefix=/usr --with-libevent-dir=/usr --with-zlib-dir=/usr --with-openssl-dir=/usr CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib $CFL"
+./configure --prefix=/usr --with-libevent-dir=/usr --with-zlib-dir=/usr --with-openssl-dir=/usr CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
 make -j4 && make install clean
 

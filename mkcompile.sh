@@ -79,6 +79,34 @@ if [ $BUILD_TYPE -lt 3 ]; then
     else
 	git clone git://git.openssl.org/openssl.git
     fi
+    if [ -d OpenSC ]; then
+	cd OpenSC
+	git pull
+	cd /usr/work/repo
+    else
+	git clone https://github.com/OpenSC/OpenSC.git
+    fi
+    if [ -d openct ]; then
+	cd openct
+	git pull
+	cd /usr/work/repo
+    else
+	git clone https://github.com/OpenSC/openct.git
+    fi
+    if [ -d libusb ]; then
+	cd libusb
+	git pull
+	cd /usr/work/repo
+    else
+	git clone http://git.libusb.org/libusb.git
+    fi
+    if [ -d libusb-compat-0.1 ]; then
+	cd libusb-compat-0.1
+	git pull
+	cd /usr/work/repo
+    else
+	git clone http://git.libusb.org/libusb-compat-0.1.git
+    fi
 fi
 if [ $BUILD_TYPE -lt 2 ]; then
     if [ -d gcc ]; then
@@ -189,10 +217,23 @@ tar xf $MINIUPNPC_ARCHIVE -C /usr/work/build/miniupnpc --strip-components=1
 
 # SCM extract
 cd /usr/work/repo
+cd openssl
 if [ $BUILD_TYPE -lt 3 ]; then
     mkdir -p /usr/work/build/openssl
-    cd openssl
+    cd /usr/work/repo/openssl
     git checkout-index -f -a --prefix=/usr/work/build/openssl/
+    mkdir -p /usr/work/build/OpenSC
+    cd ../OpenSC
+    git checkout-index -f -a --prefix=/usr/work/build/OpenSC/
+    mkdir -p /usr/work/build/openct
+    cd ../openct
+    git checkout-index -f -a --prefix=/usr/work/build/openct/
+    mkdir -p /usr/work/build/libusb
+    cd ../libusb
+    git checkout-index -f -a --prefix=/usr/work/build/libusb/
+    mkdir -p /usr/work/build/libusb-compat
+    cd ../libusb-compat-0.1
+    git checkout-index -f -a --prefix=/usr/work/build/libusb-compat/
 fi
 if [ $BUILD_TYPE -lt 3 ]; then
     mkdir -p /usr/work/build/gcc
@@ -207,31 +248,31 @@ cd /usr/work/build
 cd gmp
 if [ $BUILD_TYPE -lt 3 ]; then
     if [ -f /usr/bin/gcc-trunk ]; then
-    echo " GCC is in place"
-    cd gmp
+	echo " GCC is in place"
+	cd gmp
     else
-    # GMP
-    cd gmp
-    ./configure --prefix=/usr --enable-cxx --with-pic --enable-dependency-tracking
-    make -j4 && make install clean
-    # MPFR
-    cd ../mpfr
-    ./configure --prefix=/usr --enable-thread-safe --with-gmp=/usr --with-pic --enable-dependency-tracking
-    make -j4 && make install clean
-    # MPC
-    cd ../mpc
-    ./configure --prefix=/usr --with-gmp=/usr --with-mpfr=/usr --with-pic --enable-dependency-tracking
-    make -j4 && make install clean
-    # ClooG
-    cd ../cloog
-    ./configure --prefix=/usr --with-gcc-arch=native --with-isl=bundled --with-gmp-prefix=/usr --enable-dependency-tracking --with-pic
-    make -j4 && make install clean
-    # gcc
-    cd ../gcc
-    ./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking
-    make -j4 && make install clean
-    # preface
-    CFL="-mtune=native -march=native -m64 -fPIC"
+	# GMP
+	cd gmp
+	./configure --prefix=/usr --enable-cxx --with-pic --enable-dependency-tracking
+	make -j4 && make install clean
+	# MPFR
+	cd ../mpfr
+	./configure --prefix=/usr --enable-thread-safe --with-gmp=/usr --with-pic --enable-dependency-tracking
+	make -j4 && make install clean
+	# MPC
+	cd ../mpc
+	./configure --prefix=/usr --with-gmp=/usr --with-mpfr=/usr --with-pic --enable-dependency-tracking
+	make -j4 && make install clean
+	# ClooG
+	cd ../cloog
+	./configure --prefix=/usr --with-gcc-arch=native --with-isl=bundled --with-gmp-prefix=/usr --enable-dependency-tracking --with-pic
+	make -j4 && make install clean
+	# gcc
+	cd ../gcc
+	./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking
+	make -j4 && make install clean
+	# preface
+	CFL="-mtune=native -march=native -m64 -fPIC"
     fi
 fi
     # second circle
@@ -276,6 +317,19 @@ if [ $BUILD_TYPE -lt 3 ]; then
     ./Configure --prefix=/usr --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared linux-x86_64
     make && make install clean
     unset CC
+    cd ../libusb
+    ./autogen.sh
+    ./configure --prefix=/usr --with-pic=all --enable-dependency-tracking --enable-debug-log CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    cd ../libusb-compat
+    ./autogen.sh
+    ./configure --prefix=/usr --with-pic=all --enable-dependency-tracking --enable-debug-log CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    make -j4 && make install clean
+    cd ../openct
+    ./configure --prefix=/usr --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    make -j4 && make install clean
+    cd ../OpenSC
+    ./configure --prefix=/usr --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    make -j4 && make install clean
 fi
 if [ $BUILD_TYPE -lt 2 ]; then
     #libevent

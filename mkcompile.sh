@@ -34,7 +34,7 @@ LIBEVENT_VERSION=2.0.21
 TOR_VERSION=0.2.4.22
 ZLIB_VERSION=1.2.8
 LIBNATPMP_VERSION=20140401
-MINIUPNPC_VERSION=1.9.20140701
+MINIUPNPC_VERSION=1.9
 
 GMP_ARCHIVE=gmp-$GMP_VERSION.tar.bz2
 GMP_URL=https://gmplib.org/download/gmp/$GMP_ARCHIVE
@@ -204,6 +204,7 @@ if [ $BUILD_TYPE -lt 3 ]; then
 fi
 # compile
 cd /usr/work/build
+cd gmp
 if [ $BUILD_TYPE -lt 3 ]; then
     if [ -f /usr/bin/gcc-trunk ]; then
     echo " GCC is in place"
@@ -292,6 +293,6 @@ fi
 #tor
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib64:/usr/lib"
 cd ../tor
-./configure --prefix=/usr --enable-dependency-tracking --enable-nat-pmp --disable-asciidoc CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
+./configure --prefix=/usr --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
 make -j4 && make install clean
 

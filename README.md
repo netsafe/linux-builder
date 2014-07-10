@@ -1,6 +1,7 @@
 linux-builder
 =============
 by Alexey A. Vesnin , http://vk.com/netsafe , https://www.facebook.com/tornetsafe
+IndieGOGO campaign: https://www.indiegogo.com/projects/internet-privacy-and-acceleration-for-everyone
 
 Linux building script for Tor
 

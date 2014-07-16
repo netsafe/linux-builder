@@ -26,6 +26,19 @@ if [ $BUILD_TYPE -eq 3 ]; then
     echo "Cron build cycle is running"
 fi
 
+ARCH_TEST=`uname -p | grep -c x86_64`
+# preface
+CFL="-mtune=native -march=native -fPIC"
+ZTK=" "
+OSSL_ARCH=" "
+if [ $ARCH_TEST -gt 0 ]; then
+    ZTK=" --64 "
+    CFL="$CFL -m64 "
+    OSSL_ARCH=linux-x86_64
+else
+    OSSL_ARCH=linux-x32
+fi
+
 GMP_VERSION=6.0.0a
 MPFR_VERSION=3.1.2
 MPC_VERSION=1.0.2
@@ -245,7 +258,11 @@ if [ $BUILD_TYPE -lt 3 ]; then
 fi
 # compile
 cd /usr/work/build
-cd gmp
+if [ -d gmp ]; then
+    echo "OK"
+else
+mkdir gmp
+fi
 if [ $BUILD_TYPE -lt 3 ]; then
     if [ -f /usr/bin/gcc-trunk ]; then
 	echo " GCC is in place"
@@ -270,12 +287,10 @@ if [ $BUILD_TYPE -lt 3 ]; then
 	# gcc
 	cd ../gcc
 	./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking
-	make -j4 && make install clean
-	# preface
-	CFL="-mtune=native -march=native -m64 -fPIC"
+	make -j8 && make install clean
     fi
 fi
-    # second circle
+# second circle
 if [ $BUILD_TYPE -lt 3 ]; then
     cd ../gmp
     ./configure --prefix=/usr --enable-cxx --with-pic --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
@@ -297,11 +312,11 @@ if [ $BUILD_TYPE -lt 2 ]; then
     # gcc X2
     cd ../gcc
     ./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk
-    make -j4 && make install clean
+    make -j8 && make install clean
     # Zlib
     cd ../zlib
-    export CC="/usr/bin/gcc-trunk -mtune=native -m64 "
-    ./configure --prefix=/usr --64
+    export CC="/usr/bin/gcc-trunk $CFL "
+    ./configure --prefix=/usr $ZTK
     make && make install clean
     unset CC
     # SCTP
@@ -313,8 +328,8 @@ fi
 if [ $BUILD_TYPE -lt 3 ]; then
     #openssl
     cd ../openssl
-    export CC="/usr/bin/gcc-trunk -mtune=native -m64 "
-    ./Configure --prefix=/usr --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared linux-x86_64
+    export CC="/usr/bin/gcc-trunk $CFL "
+    ./Configure --prefix=/usr --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared $OSSL_ARCH
     make && make install clean
     unset CC
     cd ../libusb
@@ -325,10 +340,37 @@ if [ $BUILD_TYPE -lt 3 ]; then
     ./configure --prefix=/usr --with-pic=all --enable-dependency-tracking --enable-debug-log CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
     make -j4 && make install clean
     cd ../openct
-    ./configure --prefix=/usr --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
+    ./bootstrap
+    ./configure --prefix=/usr --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    make -j4 && make install
+    cp etc/init-script /etc/init.d/openct
+    ln -s /etc/init.d/openct /etc/rc0.d/K50openct
+    ln -s /etc/init.d/openct /etc/rc1.d/S50openct
+    ln -s /etc/init.d/openct /etc/rc2.d/S50openct
+    ln -s /etc/init.d/openct /etc/rc3.d/S50openct
+    ln -s /etc/init.d/openct /etc/rc4.d/S50openct
+    ln -s /etc/init.d/openct /etc/rc5.d/S50openct
+    ln -s /etc/init.d/openct /etc/rc6.d/K20openct
+
+    cp etc/openct.udev /etc/udev/rules.d/95-openct.rules
+    cp etc/openct_usb /lib/udev/openct_usb
+    cp etc/openct_pcmcia /lib/udev/openct_pcmcia
+    cp etc/openct_serial /lib/udev/openct_serial
+    chmod +x /etc/init.d/openct
+    update-rc.d openct defaults
+    G_VALID=`getent group usb | wc -l`
+    if [ $G_VALID -lt 1 ]; then
+	groupadd -r usb
+    fi
+    G_VALID=`getent group openctd | wc -l`
+    if [ $G_VALID -lt 1 ]; then
+	useradd -m -U -r openctd
+    fi
+    service openct start
+    make clean
     cd ../OpenSC
-    ./configure --prefix=/usr --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
+    ./bootstrap
+    ./configure --prefix=/usr --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
     make -j4 && make install clean
 fi
 if [ $BUILD_TYPE -lt 2 ]; then
@@ -346,7 +388,7 @@ if [ $BUILD_TYPE -lt 2 ]; then
 fi
 #tor
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib64:/usr/lib"
-cd ../tor
-./configure --prefix=/usr --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
-make -j4 && make install clean
+cd /usr/work/build/tor
+./configure --prefix=/usr --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
+make -j4 && make install
 

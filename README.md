@@ -9,10 +9,12 @@ Linux building script for Tor
 Tested on Ubuntu Linux 14.04 amd64 mini.iso
 
 for debian-like systems use this BEFORE the first script run :
+```Shell
 sudo -s
 apt-get update
 apt-get upgrade
 apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make preload
+```
 
 Command-line options :
 <no options> - full run. Need to be done if it's a first time you're doing it!
@@ -23,10 +25,12 @@ cron - just Tor, with patches
 
 Скрипт для сборки под Linux, проверен на Ubuntu 14.04 64 бита с образа mini.iso
 Если Ваша система базирована на Debian, то ПЕРЕД запуском нужно поставить и обновить следующим образом :
+```Shell
 sudo -s
 apt-get update
 apt-get upgrade
 apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make preload
+```
 
 Скрипт имеет аргументы с коммандной строки, один, через пробел :
 <без опций> - полная сборка. Это НЕОБХОДИМО сделать в первый раз!

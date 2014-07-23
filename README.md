@@ -1,4 +1,4 @@
-```Pure Data
+```Markdown
 linux-builder
 =============
 by Alexey A. Vesnin , http://vk.com/netsafe , https://www.facebook.com/tornetsafe
@@ -32,3 +32,4 @@ apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make prel
 <без опций> - полная сборка. Это НЕОБХОДИМО сделать в первый раз!
 mini - пересборка по минимуму, GMP, OpenSSL и сам Tor
 cron - только Tor, с патчами
+```

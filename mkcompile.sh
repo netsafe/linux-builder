@@ -1,394 +1,469 @@
-
-# BUILD_TYPE - determine a work list :
-# 1 - full cycle with GCC and it's supplementary libraries
-# 2 - minimal set of OpenSSL and tor itself, assuming we have run a full cycle recently and we do have all the libs we need built and available
-# 3 - crontab mode, tor only
-
-BUILD_TYPE=1
-
-IS_MINI=`echo "$1 " | grep mini | wc -c`
-if [ $IS_MINI -gt 3 ]; then
-    BUILD_TYPE=2
-else
-    IS_MINI=`echo "$1 " | grep cron | wc -c`
-    if [ $IS_MINI -gt 3 ]; then
-	BUILD_TYPE=3
-    fi
-fi
-
-if [ $BUILD_TYPE -eq 1 ]; then
-    echo "Full build cycle is running"
-fi
-if [ $BUILD_TYPE -eq 2 ]; then
-    echo "Minimal build cycle is running"
-fi
-if [ $BUILD_TYPE -eq 3 ]; then
-    echo "Cron build cycle is running"
-fi
-
-ARCH_TEST=`uname -p | grep -c x86_64`
-# preface
-CFL="-mtune=native -march=native -fPIC"
-ZTK=" "
-OSSL_ARCH=" "
-if [ $ARCH_TEST -gt 0 ]; then
-    ZTK=" --64 "
-    CFL="$CFL -m64 "
-    OSSL_ARCH=linux-x86_64
-else
-    OSSL_ARCH=linux-x32
-fi
-
-GMP_VERSION=6.0.0a
-MPFR_VERSION=3.1.2
-MPC_VERSION=1.0.2
-CLOOG_VERSION=0.18.1
-LIBEVENT_VERSION=2.0.21
-TOR_VERSION=0.2.4.22
-ZLIB_VERSION=1.2.8
-LIBNATPMP_VERSION=20140401
-MINIUPNPC_VERSION=1.9
-
-GMP_ARCHIVE=gmp-$GMP_VERSION.tar.bz2
-GMP_URL=https://gmplib.org/download/gmp/$GMP_ARCHIVE
-MPFR_ARCHIVE=mpfr-$MPFR_VERSION.tar.bz2
-MPFR_URL=http://www.mpfr.org/mpfr-current/$MPFR_ARCHIVE
-MPC_ARCHIVE=mpc-$MPC_VERSION.tar.gz
-MPC_URL=ftp://ftp.gnu.org/gnu/mpc/$MPC_ARCHIVE
-CLOOG_ARCHIVE=cloog-$CLOOG_VERSION.tar.gz
-CLOOG_URL=ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_ARCHIVE
-LIBEVENT_ARCHIVE=libevent-$LIBEVENT_VERSION-stable.tar.gz
-LIBEVENT_URL=https://github.com/downloads/libevent/libevent/$LIBEVENT_ARCHIVE
-TOR_ARCHIVE=tor-$TOR_VERSION.tar.gz
-TOR_URL=https://www.torproject.org/dist/$TOR_ARCHIVE
-ZLIB_ARCHIVE=zlib-$ZLIB_VERSION.tar.gz
-ZLIB_URL=http://zlib.net/$ZLIB_ARCHIVE
-LIBNATPMP_ARCHIVE=libnatpmp-$LIBNATPMP_VERSION.tar.gz
-LIBNATPMP_URL=http://miniupnp.free.fr/files/download.php?file=$LIBNATPMP_ARCHIVE
-MINIUPNPC_ARCHIVE=miniupnpc-$MINIUPNPC_VERSION.tar.gz
-MINIUPNPC_URL=http://miniupnp.free.fr/files/download.php?file=$MINIUPNPC_ARCHIVE
+#!/bin/bash
 
 
-if [ -d /usr/work/archive ]; then
+WORK_ROOT=/usr/work
+INSTALL_PREFIX=/usr
+
+# Toolchain-specific variables
+TOOLCHAIN=""
+TOOLCHAINS=""
+USE_TOOLCHAIN=0
+TOOLCHAIN_BUILT=0
+CC=""
+CXX=""
+CPP=""
+CFLAGS=""
+CPPFLAGS=""
+CXXFLAGS=""
+LD=""
+LDFLAGS=""
+
+DEP_BUILT=""
+REINIT_LIST=""
+MOD_LIST=""
+TARGET_LIST=""
+TEMPORARY_LIST=""
+BUILD_TARGET_MODULE=""
+IGNORE_TARGET=0
+BLOCKED_MODULES=""
+
+if [ -d ${WORK_ROOT}/archive ]; then
     echo "Work directory exists"
 else
-    mkdir -p /usr/work/archive
+    mkdir -p ${WORK_ROOT}/archive
 fi
 
-if [ -d /usr/work/repo ]; then
+if [ -d ${WORK_ROOT}/repo ]; then
     echo "Repo directory exists"
 else
-    mkdir -p /usr/work/repo
+    mkdir -p ${WORK_ROOT}/repo
 fi
 
-
-# Do the fetch
-cd /usr/work/repo
-if [ $BUILD_TYPE -lt 3 ]; then
-    if [ -d openssl ]; then
-	cd openssl
-	git pull
-	cd /usr/work/repo
-    else
-	git clone git://git.openssl.org/openssl.git
-    fi
-    if [ -d OpenSC ]; then
-	cd OpenSC
-	git pull
-	cd /usr/work/repo
-    else
-	git clone https://github.com/OpenSC/OpenSC.git
-    fi
-    if [ -d openct ]; then
-	cd openct
-	git pull
-	cd /usr/work/repo
-    else
-	git clone https://github.com/OpenSC/openct.git
-    fi
-    if [ -d libusb ]; then
-	cd libusb
-	git pull
-	cd /usr/work/repo
-    else
-	git clone http://git.libusb.org/libusb.git
-    fi
-    if [ -d libusb-compat-0.1 ]; then
-	cd libusb-compat-0.1
-	git pull
-	cd /usr/work/repo
-    else
-	git clone http://git.libusb.org/libusb-compat-0.1.git
-    fi
-fi
-if [ $BUILD_TYPE -lt 2 ]; then
-    if [ -d gcc ]; then
-	cd gcc
-	git pull
-	cd /usr/work/repo
-    else
-	git clone git://gcc.gnu.org/git/gcc.git
-    fi
-
-    if [ -d lksctp-tools ]; then
-	cd lksctp-tools
-	git pull
-	cd /usr/work/repo
-    else
-	git clone git://github.com/borkmann/lksctp-tools.git
-    fi
+if [ -d ${WORK_ROOT}/build ]; then
+    echo "Build directory exists, destroying ${WORK_ROOT}/build"
+    rm -fr ${WORK_ROOT}/build
 fi
 
-# Do the archive fetch
-cd /usr/work/archive
-if [ $BUILD_TYPE -lt 3 ]; then
-    if [ -f $GMP_ARCHIVE ]; then
-	echo "GMP archive exists"
-    else
-	wget $GMP_URL
-    fi
+mkdir -p ${WORK_ROOT}/build
 
-    if [ -f $MPFR_ARCHIVE ]; then
-	echo "MPFR archive exists"
-    else
-	wget $MPFR_URL
+# Usage: get_dependents <module_name> - it will return all the modules that are directly dependent on this very module
+function get_dependents {
+    local ON_WHAT=$1
+    local XC=`echo " $ON_WHAT" | wc -c`
+    if [ $XC -lt 3 ]; then
+	echo ""
     fi
+# so, the 1st argument is actually exists, we can go on
+    local Z=""
+    local DTMP=""
+    local EN_COUNTER=0
+    for i in $MOD_LIST; do
+	DEPLIST_NAME=${i}_DEPENDENCIES
+	DTMP=${!DEPLIST_NAME}
+	DEP_COUNTER=`echo $DTMP | grep -c $ON_WHAT`
+	if [ $DEP_COUNTER -gt 0 ]; then
+	    # potential dependency found, checking enabled status
+	    EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $i`
+	    if [ $EN_COUNTER -lt 1 ]; then
+		# OK, module is enabled
+		Z="$i $Z"
+	    fi
+	fi
+    done
+    echo $Z
+}
 
-    if [ -f $MPC_ARCHIVE ]; then
-	echo "MPC archive exists"
+
+# Usage: git_fetch <module_name> <git_scm_url>
+function git_fetch {
+    local GIT_URL=$2
+    local FOLDER_PATH=${WORK_ROOT}/repo/$1
+    if [ -d $FOLDER_PATH ]; then
+	echo "[$1] SCM repo exists, updating"
+	cd $FOLDER_PATH
+	git pull
     else
-	wget $MPC_URL
+	echo "[$1]: fetching from SCM"
+	cd ${WORK_ROOT}/repo
+	git clone $GIT_URL $1
     fi
+}
 
-    if [ -f $CLOOG_ARCHIVE ]; then
-	echo "Cloog archive exists"
+# Usage: arch_fetch <module_name> <archive_url> <archive_file_name>
+function arch_fetch {
+    local ARCH_URL=$2
+    local FILE_PATH=$WORK_ROOT/archive/$3
+    if [ -f $FILE_PATH ]; then
+	echo "[$1] archive file exists"
     else
-	wget $CLOOG_URL
+	echo "[$1] archive not found, fetching"
+	cd ${WORK_ROOT}/archive
+	wget -O $3 $ARCH_URL
     fi
+}
 
-    if [ -f $LIBEVENT_ARCHIVE ]; then
-	echo "libEvent archive exists"
+# Usage: git_extract <module_name>
+function git_extract {
+    local FOLDER_PATH=$WORK_ROOT/repo/$1
+    if [ -d $FOLDER_PATH ]; then
+	cd $FOLDER_PATH
+	echo "[$1] Git SCM extract for $1 to $WORK_ROOT/build/$1/"
+	git checkout-index -f -a --prefix=$WORK_ROOT/build/$1/
     else
-	wget $LIBEVENT_URL
+	echo "[$1] No SCM repository exists, exiting!"
+	exit 0
     fi
+}
 
-    if [ -f $ZLIB_ARCHIVE ]; then
-	echo "Zlib archive exists"
+# Usage: arch_extract <module_name> <archive_file_name>
+function arch_extract {
+    local FILE_PATH=${WORK_ROOT}/archive/$2
+    local DESTINATION=${WORK_ROOT}/build/$1
+    if [ -f $FILE_PATH ]; then
+	echo "[$1] archive exists, extracting $2 to $DESTINATION"
+	mkdir -p $DESTINATION
+	tar xf $FILE_PATH -C $DESTINATION --strip-components=1 
     else
-	wget $ZLIB_URL
+	echo "[$1] archive file $2 not found, exiting!"
+	exit 0
     fi
+}
 
-    if [ -f $LIBNATPMP_ARCHIVE ]; then
-	echo "Libnatpmp archive exists"
+# Usage: get_dependency_list <module_name> - it will return a string of modules needed to be built to compile your module
+function get_dependency_list {
+    local UNSATISFIED_DEPENDENCIES=""
+    local MODULE_NAME=$1
+    local DEPNAME=${MODULE_NAME}_DEPENDENCIES
+    local DLC=`echo ${!DEPNAME}  | wc -c`
+    if [ $DLC -lt 2 ]; then
+	echo ""
     else
-	wget $LIBNATPMP_URL -O $LIBNATPMP_ARCHIVE
+	# We have something to check up
+	local CFLAG=0
+	local MODDEPS=${MODULE_NAME}_DEPENDENCIES
+	for i in ${!MODDEPS}; do
+	    CFLAG=`echo $DEP_BUILT | grep -c $i`
+	    if [ $CFLAG -lt 1 ]; then
+		UNSATISFIED_DEPENDENCIES="$i $UNSATISFIED_DEPENDENCIES"
+	    fi
+	done
+	echo $UNSATISFIED_DEPENDENCIES
     fi
+}
 
-    if [ -f $MINIUPNPC_ARCHIVE ]; then
-	echo "Mini-UPnP client archive exists"
+# Get the module name that can be built right now
+function get_build_candidate {
+    local CANDIDATE=""
+    local CANDIDATE_DEPENDENCIES=""
+    local CDC=0
+    local CDCN=0
+    for i in $MOD_LIST; do
+	CANDIDATE_DEPENDENCIES=$(get_dependency_list $i)
+	CDC=`echo $CANDIDATE_DEPENDENCIES | wc -c`
+	if [ $CDC -lt 2 ]; then
+	    # Potential candidate is found, let's avoid a re-building loop
+	    CDCN=`echo $DEP_BUILT | grep -c $i`
+	    if [ $CDCN -lt 1 ]; then
+		CANDIDATE=$i
+	    fi
+	fi
+    done
+    echo $CANDIDATE
+}
+
+# Usage: build_module_recursive <module_name> <previous_dependency_list> - second argument is for avoiding a deadlock inside a recursive loop
+function build_module_recursive {
+    local MODULE_NAME=$1
+    local PREV_DEPLIST=$2
+    local BUILD_FUNCTION=""
+    local DEPLIST=""
+    local DCNT=`echo $DEP_BUILT | grep -c $MODULE_NAME`
+    if [ $DCNT -lt 1 ]; then
+    # Module is not built yet
+	local MDEPS=$(get_dependency_list $MODULE_NAME)
+	local DCC=`echo $MDEPS | wc -c`
+	if [ $DCC -gt 2 ]; then
+	    # Module has unresolved dependencies
+		build_available $MODULE_NAME
+		DEPLIST=$(get_dependency_list $MODULE_NAME)
+		DCC=`echo $DEPLIST | wc -c`
+		if [ $DCC -gt 2 ]; then
+		    # Loop deadlock check
+		    if [ "$DEPLIST" == "$PREV_DEPLIST" ]; then
+			echo "[$MODULE_NAME] Dependency deadlock detected : $DEPLIST Built $DEP_BUILT . Exiting"
+			exit 0
+		    else
+			build_module_recursive $MODULE_NAME "$DEPLIST"
+		    fi
+		else
+		    BUILD_FUNCTION=${MODULE_NAME}_build
+		    DCNT=`echo $DEP_BUILT | grep -c $MODULE_NAME`
+		    if [ $DCNT -lt 1 ]; then
+			echo "[$MODULE_NAME][$DCNT][$BUILT_DEP] calling directly $BUILD_FUNCTION due to an empty dependency list"
+			$BUILD_FUNCTION $MODULE_NAME
+		    fi
+		fi
+	else
+	    # Module has no further dependencies, so build it!
+	    BUILD_FUNCTION=${MODULE_NAME}_build
+	    echo "[$MODULE_NAME] calling directly $BUILD_FUNCTION"
+	    $BUILD_FUNCTION $MODULE_NAME
+	fi
+    fi
+}
+
+# Usage: build_available <module_name> - it will build all the modules that have satisfied dependencies installed. It echoes the process info and status, so avoid it's usage in a functions that are returning values
+function build_available {
+    local WFLAG=0
+    local BUILD_CANDIDATE=""
+    local BUILD_COUNTER=0
+    local BUILD_FUNCTION=""
+    local MODULE_NAME=$1
+
+    while [ $WFLAG -lt 1 ]; do
+	BUILD_CANDIDATE=$(get_build_candidate)
+	BUILD_COUNTER=`echo $BUILD_CANDIDATE | wc -c`
+	echo "Calling for build candidates: $BUILD_CANDIDATE $BUILD_COUNTER"
+	if [ $BUILD_COUNTER -gt 2 ]; then
+	    # this is non-empty module name, so it's probably needs to be built
+	    BUILD_COUNTER=`echo $DEP_BUILT | grep -c $BUILD_CANDIDATE`
+	    if [ $BUILD_COUNTER -lt 1 ]; then
+		# Module is not built yet, so we need to build it
+		BUILD_FUNCTION=${BUILD_CANDIDATE}_build
+		echo "[$MODULE_NAME][$BUILD_COUNTER] calling $BUILD_FUNCTION"
+		$BUILD_FUNCTION $BUILD_CANDIDATE
+	    else
+		echo "[$MODULE_NAME] discarding $BUILD_CANDIDATE because it's alredy been built"
+	    fi
+	else
+	    WFLAG=1
+	fi
+    done
+}
+
+# Usage remove_from_list <list_name> <token>
+function remove_from_list {
+    local LIST_NAME=$1
+    local TOKEN=$2
+    local TMP_LIST=""
+    local TMP_COPY=${!LIST_NAME}
+    for i in $TMP_COPY ; do
+	if [ "$i" == "$TOKEN" ]; then
+	    echo "Excluding $TOKEN from $LIST_NAME list"
+	else
+	    TMP_LIST="$i $TMP_LIST"
+	fi
+    done
+    eval $LIST_NAME="\"$TMP_LIST\""
+}
+
+# Usage: add_to_list <list_name> <token> - add a token to list avoiding duplicates
+function add_to_list_helper {
+    logger "adding $2 to $1"
+    local LIST_NAME=$1
+    local TOKEN=$2
+    local FLAG=1
+    local TMP_COPY=${!LIST_NAME}
+    if [ -z "$TMP_COPY" ]; then
+	eval $LIST_NAME="$TOKEN"
     else
-	wget $MINIUPNPC_URL -O $MINIUPNPC_ARCHIVE
+	for i in $TMP_COPY ; do
+	    if [ "$i" == "$TOKEN" ]; then
+		FLAG=0
+	    fi
+	done
+	if [ $FLAG -eq 1 ]; then
+	    eval $LIST_NAME="\"$TMP_COPY $TOKEN\""
+	fi
     fi
-fi
+    echo $FLAG
+}
 
-if [ -f $TOR_ARCHIVE ]; then
-    echo "Tor archive exists"
+function add_to_list {
+    local LIST_NAME=$1
+    local TOKEN=$2
+    local FLAG=1
+    local TMP_COPY=${!LIST_NAME}
+    if [ -z "$TMP_COPY" ]; then
+	eval $LIST_NAME=$TOKEN
+    else
+	for i in $TMP_COPY ; do
+	    if [ "$i" == "$TOKEN" ]; then
+		FLAG=0
+	    fi
+	done
+	if [ $FLAG -eq 1 ]; then
+	    eval $LIST_NAME="\"$TMP_COPY $TOKEN\""
+	fi
+    fi
+}
+
+# Usage: get_dependents_recursive <module_name> - return all the modules that are hierarchically depend on this one
+function get_dependents_recursive {
+    local MODULE_NAME=$1
+    local C=1
+    local CT=0
+    local CZ=0
+    local XT=""
+
+    TEMPORARY_LIST=$(get_dependents $MODULE_NAME )
+    while [ $C -gt 0 ]; do
+	CT=0
+	for i in $TEMPORARY_LIST; do
+	    XT=$(get_dependents $i )
+	    for j in $XT; do
+		CZ=$(add_to_list_helper TEMPORARY_LIST $j)
+		CT=$(( $CT + $CZ ))
+	    done
+	    if [ $CT -eq 0 ]; then
+		C=0
+	    fi
+	done
+    done
+    echo $TEMPORARY_LIST
+}
+
+# Making some preparations - scanning for module definitions in modules.d folder
+PTH=`echo $0 | awk -F "/" '{ s="" ; for(i=1;i<NF;i++){ if(i==1){ s=$i; } else { s=s"/"$i; } } printf "%s",s; }'`
+echo "path is $PTH"
+if [ "$PTH" == "." ]; then
+    MPATH=`pwd`/modules.d
+    TPATH=`pwd`/targets.d
+    CPATH=`pwd`/toolchains
 else
-    wget $TOR_URL
+    MPATH="$PTH/modules.d"
+    TPATH="$PTH/targets.d"
+    CPATH="$PTH/toolchains"
 fi
 
+modlist=`ls -C -1 $MPATH  | grep .module`
+for i in $modlist; do
+    MOD_NAME=`echo $i | sed 's/\.module//'`
+    echo "module name: $MOD_NAME file: $i "
+    if [ "$MOD_NAME" == "target" ]; then
+	echo "\"target\" is a reserved word, not for module names!"
+	exit 0
+    fi
+    if [ "$MOD_NAME" == "toolchain" ]; then
+	echo "\"toolchain\" is a reserved word, not for module names!"
+	exit 0
+    fi
+    source $MPATH/$i
+    INIT_FUNC=${MOD_NAME}_init
+    # Perform first-hand initialization process
+    INIT_RESULT=$($INIT_FUNC $MOD_NAME)
+    if [ $INIT_RESULT -eq 1 ]; then
+	REINIT_LIST="$REINIT_LIST $MOD_NAME"
+    fi
+    # fetch it
+    INIT_FUNC=${MOD_NAME}_fetch
+    $INIT_FUNC $MOD_NAME
+    MOD_LIST="$MOD_LIST $MOD_NAME"
+done
+echo "[general] Modules discovered are: $MOD_LIST"
 
-# Fetching and updating done
+tlist=`ls -C -1 $CPATH | grep .toolchain`
+for i in $tlist; do
+    TOOLCHAIN_NAME=`echo $i | sed 's/\.toolchain//'`
+    echo "toolchain name: $TOOLCHAIN_NAME file: $i "
+    if [ "$TOOLCHAIN_NAME" == "target" ]; then
+	echo "\"module\" is a reserved word, not for toolchains!"
+	exit 0
+    fi
+    if [ "$TOOLCHAIN_NAME" == "target" ]; then
+	echo "\"target\" is a reserved word, not for toolchains!"
+	exit 0
+    fi
+    source $CPATH/$i
+    TOOLCHAINS="$TOOLCHAIN_NAME $TOOLCHAINS"
+done
+echo "[general] Available toolchains are $TOOLCHAINS"
 
-if [ -d /usr/work/build ]; then
-    echo "Build directory exists, destroying"
-    rm -fr /usr/work/build
+echo "[general] Examining targets"
+targetlist=`ls -C -1 $TPATH | grep .target`
+for i in $targetlist; do
+    TARGET_NAME=`echo $i | sed 's/\.target//'`
+    echo "target name: $TARGET_NAME file: $i "
+    if [ "$TARGET_NAME" == "target" ]; then
+	echo "\"module\" is a reserved word, not for target names!"
+	exit 0
+    fi
+    if [ "$TARGET_NAME" == "toolchain" ]; then
+	echo "\"toolchain\" is a reserved word, not for target names!"
+	exit 0
+    fi
+    source $TPATH/$i
+    TARGET_LIST="$TARGET_NAME $TARGET_LIST"
+done
+echo "[general] Available targets are $TARGET_LIST"
+
+# Parsing arguments
+for i in $@; do
+    DT=`echo $i | awk -F "=" '{ print NF; }'`
+    if [ $DT -eq 2 ]; then
+	# We do have var=val statement
+	VAR=`echo $i | awk -F "=" '{ print $1; }'`
+	VAL=`echo $i | awk -F "=" '{ print $2; }'`
+	case "$VAR" in
+	    target)
+		if [ $IGNORE_TARGET -eq 0 ]; then
+		    TARGET_FUNC=${VAL}_execute
+		fi
+		;;
+	    module)
+		BUILD_TARGET_MODULE=$VAL
+		IGNORE_TARGET=1
+		;;
+	    toolchain)
+		EN_COUNTER=`echo $TOOLCHAINS | grep -c $VAL`
+		if [ $VAL -gt 0 ]; then
+		    TOOLCHAIN=$VAL
+		fi
+		;;
+	esac
+    fi
+done
+
+if [ -z $TOOLCHAIN ]; then
+    echo "[general] no toolchains specified, using gnu"
+    # Don't change it here, or you'll be expelled from Hogwards! Use --target=xxx instead
+    TOOLCHAIN=gnu
 fi
 
-mkdir -p /usr/work/build
-# extract
-cd /usr/work/archive
-mkdir /usr/work/build/gmp
-tar xf $GMP_ARCHIVE -C /usr/work/build/gmp --strip-components=1
-mkdir /usr/work/build/mpfr
-tar xf $MPFR_ARCHIVE -C /usr/work/build/mpfr --strip-components=1
-mkdir /usr/work/build/mpc
-tar xf $MPC_ARCHIVE -C /usr/work/build/mpc --strip-components=1
-mkdir /usr/work/build/cloog
-tar xf $CLOOG_ARCHIVE -C /usr/work/build/cloog --strip-components=1
-mkdir /usr/work/build/libevent
-tar xf $LIBEVENT_ARCHIVE -C /usr/work/build/libevent --strip-components=1
-mkdir /usr/work/build/tor
-tar xf $TOR_ARCHIVE -C /usr/work/build/tor --strip-components=1
-mkdir /usr/work/build/zlib
-tar xf $ZLIB_ARCHIVE -C /usr/work/build/zlib --strip-components=1
-mkdir /usr/work/build/libnatpmp
-tar xf $LIBNATPMP_ARCHIVE -C /usr/work/build/libnatpmp --strip-components=1
-mkdir /usr/work/build/miniupnpc
-tar xf $MINIUPNPC_ARCHIVE -C /usr/work/build/miniupnpc --strip-components=1
+INIT_FUNC=${TOOLCHAIN}_toolchain
+$INIT_FUNC
 
-
-# SCM extract
-cd /usr/work/repo
-cd openssl
-if [ $BUILD_TYPE -lt 3 ]; then
-    mkdir -p /usr/work/build/openssl
-    cd /usr/work/repo/openssl
-    git checkout-index -f -a --prefix=/usr/work/build/openssl/
-    mkdir -p /usr/work/build/OpenSC
-    cd ../OpenSC
-    git checkout-index -f -a --prefix=/usr/work/build/OpenSC/
-    mkdir -p /usr/work/build/openct
-    cd ../openct
-    git checkout-index -f -a --prefix=/usr/work/build/openct/
-    mkdir -p /usr/work/build/libusb
-    cd ../libusb
-    git checkout-index -f -a --prefix=/usr/work/build/libusb/
-    mkdir -p /usr/work/build/libusb-compat
-    cd ../libusb-compat-0.1
-    git checkout-index -f -a --prefix=/usr/work/build/libusb-compat/
-fi
-if [ $BUILD_TYPE -lt 3 ]; then
-    mkdir -p /usr/work/build/gcc
-    cd ../gcc
-    git checkout-index -f -a --prefix=/usr/work/build/gcc/
-    mkdir -p /usr/work/build/sctp
-    cd ../lksctp-tools
-    git checkout-index -f -a --prefix=/usr/work/build/sctp/
-fi
-# compile
-cd /usr/work/build
-if [ -d gmp ]; then
-    echo "OK"
-else
-mkdir gmp
-fi
-if [ $BUILD_TYPE -lt 3 ]; then
-    if [ -f /usr/bin/gcc-trunk ]; then
-	echo " GCC is in place"
-	cd gmp
+for i in $MOD_LIST; do
+    echo "[general] Processing $i module"
+    INIT_FUNC=${i}_actual
+    ACT_RESULT=$( $INIT_FUNC $i )
+    if [ $ACT_RESULT -eq 2 ]; then
+	echo "[$i] Actualization is not supported for the module"
     else
-	# GMP
-	cd gmp
-	./configure --prefix=/usr --enable-cxx --with-pic --enable-dependency-tracking
-	make -j4 && make install clean
-	# MPFR
-	cd ../mpfr
-	./configure --prefix=/usr --enable-thread-safe --with-gmp=/usr --with-pic --enable-dependency-tracking
-	make -j4 && make install clean
-	# MPC
-	cd ../mpc
-	./configure --prefix=/usr --with-gmp=/usr --with-mpfr=/usr --with-pic --enable-dependency-tracking
-	make -j4 && make install clean
-	# ClooG
-	cd ../cloog
-	./configure --prefix=/usr --with-gcc-arch=native --with-isl=bundled --with-gmp-prefix=/usr --enable-dependency-tracking --with-pic
-	make -j4 && make install clean
-	# gcc
-	cd ../gcc
-	./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking
-	make -j8 && make install clean
+	echo "[$i] Actualization is supported for the module: $ACT_RESULT"
+	if [ $ACT_RESULT -eq 0 ]; then
+	    DEP_UP_LIST=$(get_dependents_recursive $i )
+	    for j in $DEP_UP_LIST; do
+		remove_from_list DEP_BUILT $j
+	    done
+	fi
     fi
-fi
-# second circle
-if [ $BUILD_TYPE -lt 3 ]; then
-    cd ../gmp
-    ./configure --prefix=/usr --enable-cxx --with-pic --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-fi
-if [ $BUILD_TYPE -lt 2 ]; then
-    # MPFR
-    cd ../mpfr
-    ./configure --prefix=/usr --enable-thread-safe --with-gmp=/usr --with-pic --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-    # MPC
-    cd ../mpc
-    ./configure --prefix=/usr --with-gmp=/usr --with-mpfr=/usr --with-pic --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-    # ClooG
-    cd ../cloog
-    ./configure --prefix=/usr --with-gcc-arch=native --with-isl=bundled --with-gmp-prefix=/usr --enable-dependency-tracking --with-pic CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-    # gcc X2
-    cd ../gcc
-    ./configure --prefix=/usr --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,fortran,objc,obj-c++ --disable-java --disable-libjava --with-mpc=/usr --with-gmp=/usr --with-mpfr=/usr --with-cloog=/usr --enable-objc-gc --enable-stage1-languages=c,c++,fortran,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk
-    make -j8 && make install clean
-    # Zlib
-    cd ../zlib
-    export CC="/usr/bin/gcc-trunk $CFL "
-    ./configure --prefix=/usr $ZTK
-    make && make install clean
-    unset CC
-    # SCTP
-    cd ../sctp
-    ./bootstrap
-    ./configure --prefix=/usr --enable-dependency-tracking --with-pic CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make && make install clean
-fi
-if [ $BUILD_TYPE -lt 3 ]; then
-    #openssl
-    cd ../openssl
-    export CC="/usr/bin/gcc-trunk $CFL "
-    ./Configure --prefix=/usr --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared $OSSL_ARCH
-    make && make install clean
-    unset CC
-    cd ../libusb
-    ./autogen.sh
-    ./configure --prefix=/usr --with-pic=all --enable-dependency-tracking --enable-debug-log CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    cd ../libusb-compat
-    ./autogen.sh
-    ./configure --prefix=/usr --with-pic=all --enable-dependency-tracking --enable-debug-log CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-    cd ../openct
-    ./bootstrap
-    ./configure --prefix=/usr --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install
-    cp etc/init-script /etc/init.d/openct
-    ln -s /etc/init.d/openct /etc/rc0.d/K50openct
-    ln -s /etc/init.d/openct /etc/rc1.d/S50openct
-    ln -s /etc/init.d/openct /etc/rc2.d/S50openct
-    ln -s /etc/init.d/openct /etc/rc3.d/S50openct
-    ln -s /etc/init.d/openct /etc/rc4.d/S50openct
-    ln -s /etc/init.d/openct /etc/rc5.d/S50openct
-    ln -s /etc/init.d/openct /etc/rc6.d/K20openct
+    # do the extraction
+    INIT_FUNC=${i}_extract
+    $INIT_FUNC $i
+    echo "[$i] extracted"
+done
+echo "[general] Reinitialization is needed for $REINIT_LIST"
 
-    cp etc/openct.udev /etc/udev/rules.d/95-openct.rules
-    cp etc/openct_usb /lib/udev/openct_usb
-    cp etc/openct_pcmcia /lib/udev/openct_pcmcia
-    cp etc/openct_serial /lib/udev/openct_serial
-    chmod +x /etc/init.d/openct
-    update-rc.d openct defaults
-    G_VALID=`getent group usb | wc -l`
-    if [ $G_VALID -lt 1 ]; then
-	groupadd -r usb
-    fi
-    G_VALID=`getent group openctd | wc -l`
-    if [ $G_VALID -lt 1 ]; then
-	useradd -m -U -r openctd
-    fi
-    service openct start
-    make clean
-    cd ../OpenSC
-    ./bootstrap
-    ./configure --prefix=/usr --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-fi
-if [ $BUILD_TYPE -lt 2 ]; then
-    #libevent
-    cd ../libevent
-    ./configure --prefix=/usr --with-pic CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="$CFL"
-    make -j4 && make install clean
-    #libnatpmp
-    cd ../libnatpmp
-    make CC=/usr/bin/gcc-trunk && make install
-    cp /usr/work/build/libnatpmp/declspec.h /usr/include
-    #miniupnpc
-    cd ../miniupnpc
-    make CC=/usr/bin/gcc-trunk && make install
-fi
-#tor
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib64:/usr/lib"
-cd /usr/work/build/tor
-./configure --prefix=/usr --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc --sysconfdir=/etc --localstatedir=/var CC=/usr/bin/gcc-trunk CXX=/usr/bin/g++-trunk CFLAGS="-L/usr/lib -L/usr/lib64 $CFL"
-make -j4 && make install
 
+if [ -z $BUILD_TARGET_MODULE ]; then
+    echo "no target modules available"
+    if [ $IGNORE_TARGET -lt 1 ]; then
+	$TARGET_FUNC
+    fi
+else
+    INIT_FUNC=${BUILD_TARGET_MODULE}_build
+    $INIT_FUNC $BUILD_TARGET_MODULE
+fi
+echo "[general] Modules built: $DEP_BUILT"
+echo "[general] Finishing"

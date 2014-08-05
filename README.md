@@ -18,9 +18,9 @@ apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make prel
 ```
 ```Markdown
 Command-line options :
-<no options> - full run. Need to be done if it's a first time you're doing it!
-mini - minimal assembly, GMP, OpenSSL and Tor
-cron - just Tor, with patches
+target=fullcycle - full run. Need to be done if it's a first time you're doing it!
+target=mini - minimal assembly, GMP, OpenSSL and Tor
+target=cron - just Tor, with patches
 
 Русская версия:
 
@@ -35,7 +35,7 @@ apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make prel
 ```
 ```Markdown
 Скрипт имеет аргументы с коммандной строки, один, через пробел :
-<без опций> - полная сборка. Это НЕОБХОДИМО сделать в первый раз!
-mini - пересборка по минимуму, GMP, OpenSSL и сам Tor
-cron - только Tor, с патчами
+target=fullcycle сборка. Это НЕОБХОДИМО сделать в первый раз!
+target=mini - пересборка по минимуму, GMP, OpenSSL и сам Tor
+target=cron - только Tor, с патчами
 ```

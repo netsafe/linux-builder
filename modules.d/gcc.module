@@ -1,0 +1,58 @@
+
+# GNU compiler collection
+
+
+gcc_DEPENDENCIES="gmp mpfr mpc cloog"
+
+function gcc_init {
+    add_to_list BLOCKED_MODULES gcc
+    echo "0"
+}
+
+function gcc_fetch {
+    git_fetch $1 git://gcc.gnu.org/git/gcc.git
+}
+
+function gcc_extract {
+    git_extract $1
+}
+
+function gcc_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,objc,obj-c++ --disable-java --disable-libjava --with-mpc=$INSTALL_PREFIX --with-gmp=$INSTALL_PREFIX --with-mpfr=$INSTALL_PREFIX --with-cloog=$INSTALL_PREFIX --enable-objc-gc --enable-stage1-languages=c,c++,objc,obj-c++ --enable-lto --enable-libssp --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multiarch --enable-multilib --enable-dependency-tracking $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function gcc_actual {
+    if [ -f ${INSTALL_PREFIX}/bin/gcc-trunk ]; then
+	VC=`${INSTALL_PREFIX}/bin/gcc-trunk -v 2>&1 | grep -E "^gcc version " | awk '{ printf "date -d %s \"+%%s\" \n",$4; }' | /bin/bash `
+	NOW=`date +%s`
+	SECONDS=$(( $NOW - $VC ))
+	DAYS=$(( $SECONDS / 86400 ))
+	if [ $DAYS -gt 14 ]; then
+	    # We have an old compiler, older than 14 days - rebuild is in order
+	    echo "0"
+	else
+	    # We have a good standing with compile date, and we're pre-assuming that it was a full build
+	    add_to_list DEP_BUILT gcc
+	    add_to_list DEP_BUILT gmp
+	    add_to_list DEP_BUILT mpfr
+	    add_to_list DEP_BUILT mpc
+	    add_to_list DEP_BUILT cloog
+	    echo "1"
+	fi
+    else
+	# No gcc trunk compiler exists
+	echo "0"
+    fi
+}
+
+function gcc_getactualdependency {
+    echo $gcc_DEPENDENCIES
+}
+

@@ -1,0 +1,38 @@
+# OpenSC
+
+opensc_DEPENDENCIES="toolchain openct libusb_compat"
+
+function opensc_init {
+    echo "0"
+}
+
+function opensc_fetch {
+    git_fetch $1 https://github.com/OpenSC/OpenSC.git
+}
+
+function opensc_extract {
+    git_extract $1
+}
+
+function opensc_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./bootstrap
+    ./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var $ADDENDUM
+    make -j4 && make install
+
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function opensc_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function opensc_getactualdependency {
+    echo $opensc_DEPENDENCIES
+}
+

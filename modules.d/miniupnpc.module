@@ -1,0 +1,41 @@
+# mini UPnP client
+
+MINIUPNPC_VERSION=1.9
+MINIUPNPC_ARCHIVE=miniupnpc-$MINIUPNPC_VERSION.tar.gz
+MINIUPNPC_URL=http://miniupnp.free.fr/files/download.php?file=$MINIUPNPC_ARCHIVE
+
+miniupnpc_DEPENDENCIES="toolchain"
+
+function miniupnpc_init {
+    echo "0"
+}
+
+function miniupnpc_fetch {
+    arch_fetch $1 $MINIUPNPC_URL $MINIUPNPC_ARCHIVE
+}
+
+function miniupnpc_extract {
+    arch_extract $1 $MINIUPNPC_ARCHIVE
+}
+
+function miniupnpc_build {
+    cd $WORK_ROOT/build/$1
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	make CC="$CC $CFLAGS"
+    else
+	make
+    fi
+
+    make install
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function miniupnpc_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function miniupnpc_getactualdependency {
+    echo $miniupnpc_DEPENDENCIES
+}
+

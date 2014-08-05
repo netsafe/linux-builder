@@ -1,0 +1,22 @@
+# GNU Compiler Collection toolchain, the default one
+
+function gnu_toolchain {
+    local TMP_DEP_LIST=""
+    local DEP_LIST_VAR=""
+    for i in $MOD_LIST; do
+	echo "[GNU toolchain] Examining $i"
+	TMP_DEP_LIST=""
+	DEP_LIST_VAR=${i}_DEPENDENCIES
+	for j in ${!DEP_LIST_VAR}; do
+	    if [ "$j" == "toolchain" ]; then
+		TMP_DEP_LIST="gcc $TMP_DEP_LIST"
+		echo "[GNU toolchain] Fixing $i"
+	    else
+		TMP_DEP_LIST="$j $TMP_DEP_LIST"
+	    fi
+	done
+	eval $DEP_LIST_VAR="\"$TMP_DEP_LIST\""
+    done
+    # unblock the compiler module
+    remove_from_list BLOCKED_MODULES gcc
+}

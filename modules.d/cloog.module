@@ -1,0 +1,41 @@
+
+# ClooG library
+
+CLOOG_VERSION=0.18.1
+CLOOG_ARCHIVE=cloog-$CLOOG_VERSION.tar.gz
+CLOOG_URL=ftp://gcc.gnu.org/pub/gcc/infrastructure/$CLOOG_ARCHIVE
+
+cloog_DEPENDENCIES=gmp
+
+function cloog_init {
+    echo "0"
+}
+
+function cloog_fetch {
+    arch_fetch $1 $CLOOG_URL $CLOOG_ARCHIVE
+}
+
+function cloog_extract {
+    arch_extract $1 $CLOOG_ARCHIVE
+}
+
+function cloog_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX --with-isl=bundled --with-gmp-prefix=$INSTALL_PREFIX --enable-dependency-tracking --with-pic $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function cloog_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function cloog_getactualdependency {
+    echo $cloog_DEPENDENCIES
+}
+

@@ -1,0 +1,40 @@
+
+# OpenSSL
+
+openssl_DEPENDENCIES="gmp zlib sctp toolchain"
+
+function openssl_init {
+    echo "0"
+}
+
+function openssl_fetch {
+    git_fetch $1 git://git.openssl.org/openssl.git
+}
+
+function openssl_extract {
+    git_extract $1
+}
+
+function openssl_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	export CC="$CC $CFLAGS"
+    fi
+    cd $WORK_ROOT/build/$1
+    ./config --prefix=$INSTALL_PREFIX --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared
+    make && make install clean
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	unset CC
+    fi
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function openssl_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function openssl_getactualdependency {
+    echo $openssl_DEPENDENCIES
+}
+

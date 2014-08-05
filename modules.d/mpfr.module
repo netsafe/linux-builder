@@ -1,0 +1,41 @@
+
+# MPFR library
+
+MPFR_VERSION=3.1.2
+MPFR_ARCHIVE=mpfr-$MPFR_VERSION.tar.bz2
+MPFR_URL=http://www.mpfr.org/mpfr-current/$MPFR_ARCHIVE
+
+mpfr_DEPENDENCIES=gmp
+
+function mpfr_init {
+    echo "0"
+}
+
+function mpfr_fetch {
+    arch_fetch $1 $MPFR_URL $MPFR_ARCHIVE
+}
+
+function mpfr_extract {
+    arch_extract $1 $MPFR_ARCHIVE
+}
+
+function mpfr_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX --enable-thread-safe --with-gmp=$INSTALL_PREFIX --with-pic --enable-dependency-tracking $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function mpfr_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function mpfr_getactualdependency {
+    echo $mpfr_DEPENDENCIES
+}
+

@@ -1,0 +1,3 @@
+function fullcycle_execute {
+    build_module_recursive tor
+}

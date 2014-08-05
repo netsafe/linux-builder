@@ -1,0 +1,38 @@
+
+# libUSB compatibility layer for 0.1 API
+
+libusb_compat_DEPENDENCIES="toolchain libusb"
+
+function libusb_compat_init {
+    echo "0"
+}
+
+function libusb_compat_fetch {
+    git_fetch $1 http://git.libusb.org/libusb-compat-0.1.git
+}
+
+function libusb_compat_extract {
+    git_extract $1
+}
+
+function libusb_compat_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./autogen.sh
+    ./configure --prefix=$INSTALL_PREFIX --with-pic=all --enable-dependency-tracking --enable-debug-log $ADDENDUM
+    make && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function libusb_compat_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function libusb_compat_getactualdependency {
+    echo $libusb_compat_DEPENDENCIES
+}
+

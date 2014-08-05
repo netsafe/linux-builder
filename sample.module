@@ -1,0 +1,39 @@
+# A module definition sample. Use it to add your specific software to the build
+# Remove all the echoes except two last functions last ones!
+
+# Пример файла определения модуля. Используйте его для добавления специфического ПО для Ваших нужд в сборку
+# Не забудьте убрать ВСЕ эхо-выводы кроме последних в двух последних функциях!
+
+sample_DEPENDENCIES=""
+
+function sample_init {
+    echo "[$1] module initalizer called"
+}
+
+function sample_fetch {
+    echo "[$1] module fetcher called"
+}
+
+function sample_extract {
+    echo "[$1] module exracter called"
+}
+
+function sample_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function sample_actual {
+    echo "2"
+}
+
+function sample_getactualdependency {
+    echo sample_DEPENDENCIES
+}
+

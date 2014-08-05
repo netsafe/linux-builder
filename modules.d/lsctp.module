@@ -1,0 +1,38 @@
+
+# Linux SCTP
+
+lsctp_DEPENDENCIES=""
+
+function lsctp_init {
+    echo "0"
+}
+
+function lsctp_fetch {
+    git_fetch $1 git://github.com/borkmann/lksctp-tools.git
+}
+
+function lsctp_extract {
+    git_extract $1
+}
+
+function lsctp_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./bootstrap
+    ./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --with-pic $ADDENDUM
+    make && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function lsctp_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function lsctp_getactualdependency {
+    echo $lsctp_DEPENDENCIES
+}
+

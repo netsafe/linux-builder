@@ -1,0 +1,42 @@
+
+# MPC library
+
+MPC_VERSION=1.0.2
+MPC_ARCHIVE=mpc-$MPC_VERSION.tar.gz
+MPC_URL=ftp://ftp.gnu.org/gnu/mpc/$MPC_ARCHIVE
+
+
+mpc_DEPENDENCIES="gmp mpfr"
+
+function mpc_init {
+    echo "0"
+}
+
+function mpc_fetch {
+    arch_fetch $1 $MPC_URL $MPC_ARCHIVE
+}
+
+function mpc_extract {
+    arch_extract $1 $MPC_ARCHIVE
+}
+
+function mpc_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX --enable-thread-safe --with-gmp=$INSTALL_PREFIX --with-mpfr=$INSTALL_PREFIX --with-pic --enable-dependency-tracking $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function mpc_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function mpc_getactualdependency {
+    echo $mpc_DEPENDENCIES
+}
+

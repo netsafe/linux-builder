@@ -1,0 +1,46 @@
+
+# The Onion Router
+
+TOR_VERSION=0.2.4.22
+TOR_ARCHIVE=tor-$TOR_VERSION.tar.gz
+TOR_URL=https://www.torproject.org/dist/$TOR_ARCHIVE
+
+
+tor_DEPENDENCIES="toolchain libnatpmp miniupnpc openssl libevent"
+
+function tor_init {
+    echo "0"
+}
+
+function tor_fetch {
+    arch_fetch $1 $TOR_URL $TOR_ARCHIVE
+}
+
+function tor_extract {
+    arch_extract $1 $TOR_ARCHIVE
+}
+
+function tor_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    G_VALID=`getent group tor | wc -l`
+    if [ $G_VALID -lt 1 ]; then
+	useradd -m -U -r tor
+    fi
+    ./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc --sysconfdir=/etc --localstatedir=/var $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function tor_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function tor_getactualdependency {
+    echo ""
+}
+

@@ -1,0 +1,43 @@
+# libnatpmp
+
+LIBNATPMP_VERSION=20140401
+LIBNATPMP_ARCHIVE=libnatpmp-$LIBNATPMP_VERSION.tar.gz
+LIBNATPMP_URL=http://miniupnp.free.fr/files/download.php?file=$LIBNATPMP_ARCHIVE
+
+libnatpmp_DEPENDENCIES="toolchain"
+
+function libnatpmp_init {
+    echo "0"
+}
+
+function libnatpmp_fetch {
+    arch_fetch $1 $LIBNATPMP_URL $LIBNATPMP_ARCHIVE
+}
+
+function libnatpmp_extract {
+    arch_extract $1 $LIBNATPMP_ARCHIVE
+}
+
+function libnatpmp_build {
+    cd $WORK_ROOT/build/$1
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	make CC="$CC $CFLAGS"
+    else
+	make
+    fi
+
+    make install
+    cp ${WORK_ROOT}/build/libnatpmp/declspec.h ${INSTALL_PREFIX}/include    
+
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function libnatpmp_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function libnatpmp_getactualdependency {
+    echo $libnatpmp_DEPENDENCIES
+}
+

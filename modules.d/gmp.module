@@ -1,0 +1,40 @@
+
+# GNU multiprecision library
+
+GMP_VERSION=6.0.0a
+GMP_ARCHIVE=gmp-$GMP_VERSION.tar.bz2
+GMP_URL=https://gmplib.org/download/gmp/$GMP_ARCHIVE
+gmp_DEPENDENCIES=""
+
+function gmp_init {
+    echo "0"
+}
+
+function gmp_fetch {
+    arch_fetch $1 $GMP_URL $GMP_ARCHIVE
+}
+
+function gmp_extract {
+    arch_extract $1 $GMP_ARCHIVE
+}
+
+function gmp_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    ./configure --prefix=$INSTALL_PREFIX --enable-cxx --with-pic --enable-dependency-tracking $ADDENDUM
+    make -j4 && make install clean
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function gmp_actual {
+    # TODO: implement a version check! Stub for now
+    echo "2"
+}
+
+function gmp_getactualdependency {
+    echo ""
+}
+

@@ -26,6 +26,7 @@ TEMPORARY_LIST=""
 BUILD_TARGET_MODULE=""
 IGNORE_TARGET=0
 BLOCKED_MODULES=""
+TRACE_RUN=0
 
 if [ -d ${WORK_ROOT}/archive ]; then
     echo "Work directory exists"
@@ -33,16 +34,19 @@ else
     mkdir -p ${WORK_ROOT}/archive
 fi
 
+if [ -d ${WORK_ROOT}/logs ]; then
+    echo "Log directory exists"
+else
+    mkdir -p ${WORK_ROOT}/logs
+fi
+
+
 if [ -d ${WORK_ROOT}/repo ]; then
     echo "Repo directory exists"
 else
     mkdir -p ${WORK_ROOT}/repo
 fi
 
-if [ -d ${WORK_ROOT}/build ]; then
-    echo "Build directory exists, destroying ${WORK_ROOT}/build"
-    rm -fr ${WORK_ROOT}/build
-fi
 
 mkdir -p ${WORK_ROOT}/build
 
@@ -60,7 +64,7 @@ function get_dependents {
     for i in $MOD_LIST; do
 	DEPLIST_NAME=${i}_DEPENDENCIES
 	DTMP=${!DEPLIST_NAME}
-	DEP_COUNTER=`echo $DTMP | grep -c $ON_WHAT`
+	DEP_COUNTER=`echo "$DTMP" | grep -c $ON_WHAT`
 	if [ $DEP_COUNTER -gt 0 ]; then
 	    # potential dependency found, checking enabled status
 	    EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $i`
@@ -142,7 +146,7 @@ function get_dependency_list {
 	local CFLAG=0
 	local MODDEPS=${MODULE_NAME}_DEPENDENCIES
 	for i in ${!MODDEPS}; do
-	    CFLAG=`echo $DEP_BUILT | grep -c $i`
+	    CFLAG=`echo "$DEP_BUILT" | grep -c $i`
 	    if [ $CFLAG -lt 1 ]; then
 		UNSATISFIED_DEPENDENCIES="$i $UNSATISFIED_DEPENDENCIES"
 	    fi
@@ -162,7 +166,7 @@ function get_build_candidate {
 	CDC=`echo $CANDIDATE_DEPENDENCIES | wc -c`
 	if [ $CDC -lt 2 ]; then
 	    # Potential candidate is found, let's avoid a re-building loop
-	    CDCN=`echo $DEP_BUILT | grep -c $i`
+	    CDCN=`echo "$DEP_BUILT" | grep -c $i`
 	    if [ $CDCN -lt 1 ]; then
 		CANDIDATE=$i
 	    fi
@@ -177,7 +181,7 @@ function build_module_recursive {
     local PREV_DEPLIST=$2
     local BUILD_FUNCTION=""
     local DEPLIST=""
-    local DCNT=`echo $DEP_BUILT | grep -c $MODULE_NAME`
+    local DCNT=`echo "$DEP_BUILT" | grep -c $MODULE_NAME`
     if [ $DCNT -lt 1 ]; then
     # Module is not built yet
 	local MDEPS=$(get_dependency_list $MODULE_NAME)
@@ -193,11 +197,12 @@ function build_module_recursive {
 			echo "[$MODULE_NAME] Dependency deadlock detected : $DEPLIST Built $DEP_BUILT . Exiting"
 			exit 0
 		    else
+			echo "[$MODULE_NAME][$DCNT][$BUILT_DEP] calling directly $BUILD_FUNCTION"
 			build_module_recursive $MODULE_NAME "$DEPLIST"
 		    fi
 		else
 		    BUILD_FUNCTION=${MODULE_NAME}_build
-		    DCNT=`echo $DEP_BUILT | grep -c $MODULE_NAME`
+		    DCNT=`echo "$DEP_BUILT" | grep -c $MODULE_NAME`
 		    if [ $DCNT -lt 1 ]; then
 			echo "[$MODULE_NAME][$DCNT][$BUILT_DEP] calling directly $BUILD_FUNCTION due to an empty dependency list"
 			$BUILD_FUNCTION $MODULE_NAME
@@ -219,6 +224,7 @@ function build_available {
     local BUILD_COUNTER=0
     local BUILD_FUNCTION=""
     local MODULE_NAME=$1
+    local EN_COUNTER=0
 
     while [ $WFLAG -lt 1 ]; do
 	BUILD_CANDIDATE=$(get_build_candidate)
@@ -226,12 +232,15 @@ function build_available {
 	echo "Calling for build candidates: $BUILD_CANDIDATE $BUILD_COUNTER"
 	if [ $BUILD_COUNTER -gt 2 ]; then
 	    # this is non-empty module name, so it's probably needs to be built
-	    BUILD_COUNTER=`echo $DEP_BUILT | grep -c $BUILD_CANDIDATE`
+	    BUILD_COUNTER=`echo "$DEP_BUILT" | grep -c $BUILD_CANDIDATE`
 	    if [ $BUILD_COUNTER -lt 1 ]; then
-		# Module is not built yet, so we need to build it
-		BUILD_FUNCTION=${BUILD_CANDIDATE}_build
-		echo "[$MODULE_NAME][$BUILD_COUNTER] calling $BUILD_FUNCTION"
-		$BUILD_FUNCTION $BUILD_CANDIDATE
+		EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $BUILD_CANDIDATE`
+		if [ $EN_COUNTER -eq 0 ]; then
+		    # Module is not built yet, so we need to build it
+		    BUILD_FUNCTION=${BUILD_CANDIDATE}_build
+		    echo "[$MODULE_NAME][$BUILD_COUNTER] calling $BUILD_FUNCTION Built list is [$DEP_BUILT]"
+		    $BUILD_FUNCTION $BUILD_CANDIDATE
+		fi
 	    else
 		echo "[$MODULE_NAME] discarding $BUILD_CANDIDATE because it's alredy been built"
 	    fi
@@ -296,6 +305,7 @@ function add_to_list {
 	    eval $LIST_NAME="\"$TMP_COPY $TOKEN\""
 	fi
     fi
+    echo "Adding $2 to $1 [${!LIST_NAME}]" >> /tmp/addlog
 }
 
 # Usage: get_dependents_recursive <module_name> - return all the modules that are hierarchically depend on this one
@@ -336,32 +346,6 @@ else
     CPATH="$PTH/toolchains"
 fi
 
-modlist=`ls -C -1 $MPATH  | grep .module`
-for i in $modlist; do
-    MOD_NAME=`echo $i | sed 's/\.module//'`
-    echo "module name: $MOD_NAME file: $i "
-    if [ "$MOD_NAME" == "target" ]; then
-	echo "\"target\" is a reserved word, not for module names!"
-	exit 0
-    fi
-    if [ "$MOD_NAME" == "toolchain" ]; then
-	echo "\"toolchain\" is a reserved word, not for module names!"
-	exit 0
-    fi
-    source $MPATH/$i
-    INIT_FUNC=${MOD_NAME}_init
-    # Perform first-hand initialization process
-    INIT_RESULT=$($INIT_FUNC $MOD_NAME)
-    if [ $INIT_RESULT -eq 1 ]; then
-	REINIT_LIST="$REINIT_LIST $MOD_NAME"
-    fi
-    # fetch it
-    INIT_FUNC=${MOD_NAME}_fetch
-    $INIT_FUNC $MOD_NAME
-    MOD_LIST="$MOD_LIST $MOD_NAME"
-done
-echo "[general] Modules discovered are: $MOD_LIST"
-
 tlist=`ls -C -1 $CPATH | grep .toolchain`
 for i in $tlist; do
     TOOLCHAIN_NAME=`echo $i | sed 's/\.toolchain//'`
@@ -375,9 +359,41 @@ for i in $tlist; do
 	exit 0
     fi
     source $CPATH/$i
+    INIT_FUNC=${TOOLCHAIN_NAME}_lock
+    $INIT_FUNC $TOOLCHAIN_NAME
     TOOLCHAINS="$TOOLCHAIN_NAME $TOOLCHAINS"
 done
 echo "[general] Available toolchains are $TOOLCHAINS"
+
+modlist=`ls -C -1 $MPATH  | grep .module`
+for i in $modlist; do
+    MOD_NAME=`echo $i | sed 's/\.module//'`
+    echo "module name: $MOD_NAME file: $i "
+    if [ "$MOD_NAME" == "target" ]; then
+	echo "\"target\" is a reserved word, not for module names!"
+	exit 0
+    fi
+    if [ "$MOD_NAME" == "toolchain" ]; then
+	echo "\"toolchain\" is a reserved word, not for module names!"
+	exit 0
+    fi
+    source $MPATH/$i
+    EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $MOD_NAME`
+    if [ $EN_COUNTER -eq 0 ]; then
+	INIT_FUNC=${MOD_NAME}_init
+	# Perform first-hand initialization process
+	INIT_RESULT=$($INIT_FUNC $MOD_NAME)
+	if [ $INIT_RESULT -eq 1 ]; then
+	    REINIT_LIST="$REINIT_LIST $MOD_NAME"
+	fi
+	# fetch it
+	INIT_FUNC=${MOD_NAME}_fetch
+	$INIT_FUNC $MOD_NAME
+	MOD_LIST="$MOD_LIST $MOD_NAME"
+    fi
+done
+echo "[general] Modules discovered are: $MOD_LIST"
+
 
 echo "[general] Examining targets"
 targetlist=`ls -C -1 $TPATH | grep .target`
@@ -420,6 +436,9 @@ for i in $@; do
 		    TOOLCHAIN=$VAL
 		fi
 		;;
+	    trace)
+		TRACE_RUN=$VAL
+		;;
 	esac
     fi
 done
@@ -432,6 +451,14 @@ fi
 
 INIT_FUNC=${TOOLCHAIN}_toolchain
 $INIT_FUNC
+
+if [ -d ${WORK_ROOT}/build ]; then
+    if [ $TRACE_RUN -eq 0 ]; then
+	echo "Build directory exists, destroying ${WORK_ROOT}/build"
+	rm -fr ${WORK_ROOT}/build
+    fi
+fi
+
 
 for i in $MOD_LIST; do
     echo "[general] Processing $i module"
@@ -448,20 +475,26 @@ for i in $MOD_LIST; do
 	    done
 	fi
     fi
-    # do the extraction
-    INIT_FUNC=${i}_extract
-    $INIT_FUNC $i
-    echo "[$i] extracted"
+    if [ $TRACE_RUN -eq 0 ]; then
+	# do the extraction
+	INIT_FUNC=${i}_extract
+	$INIT_FUNC $i
+	echo "[$i] extracted"
+    fi
 done
-echo "[general] Reinitialization is needed for $REINIT_LIST"
-
+if [ -z $REINIT_LIST ]; then
+    echo "[general] No need to reinitialize any of the modules"
+else
+    echo "[general] Reinitialization is needed for $REINIT_LIST"
+fi
 
 if [ -z $BUILD_TARGET_MODULE ]; then
-    echo "no target modules available"
+    echo "no target modules available, using build target"
     if [ $IGNORE_TARGET -lt 1 ]; then
 	$TARGET_FUNC
     fi
 else
+    echo "building precisely the module named $BUILD_TARGET_MODULE"
     INIT_FUNC=${BUILD_TARGET_MODULE}_build
     $INIT_FUNC $BUILD_TARGET_MODULE
 fi

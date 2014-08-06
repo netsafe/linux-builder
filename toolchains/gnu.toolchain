@@ -1,5 +1,9 @@
 # GNU Compiler Collection toolchain, the default one
 
+function gnu_lock {
+    add_to_list BLOCKED_MODULES gcc
+}
+
 function gnu_toolchain {
     local TMP_DEP_LIST=""
     local DEP_LIST_VAR=""

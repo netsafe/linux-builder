@@ -1,7 +1,3 @@
 function cron_execute {
-    local DLIST=$(get_dependencies_recursive tor )
-    for i in $DLIST; do
-	add_to_list DEP_BUILT $i
-    done
-    build_module_recursive tor
+    tor_build tor
 }

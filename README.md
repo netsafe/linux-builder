@@ -21,6 +21,7 @@ Command-line options :
 target=fullcycle - full run. Need to be done if it's a first time you're doing it!
 target=mini - minimal assembly, GMP, OpenSSL and Tor
 target=cron - just Tor, with patches
+trace=1 - just run trace
 
 Русская версия:
 
@@ -38,4 +39,5 @@ apt-get install gcc gcc-multilib g++ bc m4 flex bison libtool automake make prel
 target=fullcycle сборка. Это НЕОБХОДИМО сделать в первый раз!
 target=mini - пересборка по минимуму, GMP, OpenSSL и сам Tor
 target=cron - только Tor, с патчами
+trace=1 - протрассировать без сборки
 ```

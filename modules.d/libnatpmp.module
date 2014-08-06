@@ -20,15 +20,15 @@ function libnatpmp_extract {
 
 function libnatpmp_build {
     cd $WORK_ROOT/build/$1
+    local TK=" "
     if [ $USE_TOOLCHAIN -gt 0 ]; then
-	make CC="$CC $CFLAGS"
-    else
-	make
+	TK="CC=\"$CC $CFLAGS\" "
     fi
-
-    make install
-    cp ${WORK_ROOT}/build/libnatpmp/declspec.h ${INSTALL_PREFIX}/include    
-
+    if [ $TRACE_RUN -eq 0 ]; then
+	make $TK INSTALLPREFIX=${INSTALL_PREFIX} &> ${WORK_ROOT}/logs/$1.log
+	make install &> /dev/null
+	cp ${WORK_ROOT}/build/libnatpmp/declspec.h ${INSTALL_PREFIX}/include
+    fi
     DEP_BUILT="$1 $DEP_BUILT"
 }
 

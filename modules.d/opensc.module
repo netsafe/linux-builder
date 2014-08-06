@@ -20,10 +20,11 @@ function opensc_build {
 	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
     fi
     cd $WORK_ROOT/build/$1
-    ./bootstrap
-    ./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var $ADDENDUM
-    make -j4 && make install
-
+    if [ $TRACE_RUN -eq 0 ]; then
+	./bootstrap &> ${WORK_ROOT}/logs/$1-bootstrap.log
+	./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j4 &> ${WORK_ROOT}/logs/$1.log && make install &> /dev/null
+    fi
     DEP_BUILT="$1 $DEP_BUILT"
 }
 

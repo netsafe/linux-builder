@@ -21,8 +21,10 @@ function openssl_build {
 	export CC="$CC $CFLAGS"
     fi
     cd $WORK_ROOT/build/$1
-    ./config --prefix=$INSTALL_PREFIX --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared
-    make && make install clean
+    if [ $TRACE_RUN -eq 0 ]; then
+	./config --prefix=$INSTALL_PREFIX --openssldir=/etc/ssl threads zlib enable-ec_nistp_64_gcc_128  enable-cbc3 enable-blowfish enable-bf enable-idea enable-ec shared &> ${WORK_ROOT}/logs/$1-configure.log
+	make &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+    fi
     if [ $USE_TOOLCHAIN -gt 0 ]; then
 	unset CC
     fi

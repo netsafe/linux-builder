@@ -20,13 +20,20 @@ function miniupnpc_extract {
 
 function miniupnpc_build {
     cd $WORK_ROOT/build/$1
+    local XT=" "
     if [ $USE_TOOLCHAIN -gt 0 ]; then
-	make CC="$CC $CFLAGS"
+	XT="CC=\"$CC $CFLAGS\" "
     else
-	make
+	XT=" "
     fi
-
-    make install
+    if [ $TRACE_RUN -eq 0 ]; then
+	make $XT INSTALLPREFIX=$INSTALL_PREFIX &> ${WORK_ROOT}/logs/$1.log
+	local DOCNAME=$INSTALL_PREFIX/share/man/man3/miniupnpc.3.gz
+	if [ -f $DOCNAME ]; then
+	    rm $DOCNAME
+	fi
+	make install &> /dev/null
+    fi
     DEP_BUILT="$1 $DEP_BUILT"
 }
 

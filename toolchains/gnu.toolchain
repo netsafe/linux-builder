@@ -22,5 +22,7 @@ function gnu_toolchain {
 	eval $DEP_LIST_VAR="\"$TMP_DEP_LIST\""
     done
     # unblock the compiler module
+    init_module_by_name gcc
     remove_from_list BLOCKED_MODULES gcc
+    add_to_list MOD_LIST gcc
 }

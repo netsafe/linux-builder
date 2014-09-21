@@ -333,6 +333,24 @@ function get_dependents_recursive {
     echo $TEMPORARY_LIST
 }
 
+# Usage: init_module_by_name <module_name> - do module initialization
+function init_module_by_name {
+    local MODULE_NAME=$1
+
+	INIT_FUNC=${MODULE_NAME}_init
+	# Perform first-hand initialization process
+	INIT_RESULT=$($INIT_FUNC $MODULE_NAME)
+	if [ $INIT_RESULT -eq 1 ]; then
+	    REINIT_LIST="$REINIT_LIST $MODULE_NAME"
+	fi
+	# fetch it
+	INIT_FUNC=${MODULE_NAME}_fetch
+	$INIT_FUNC $MODULE_NAME
+	MOD_LIST="$MOD_LIST $MODULE_NAME"
+
+}
+
+
 # Making some preparations - scanning for module definitions in modules.d folder
 PTH=`echo $0 | awk -F "/" '{ s="" ; for(i=1;i<NF;i++){ if(i==1){ s=$i; } else { s=s"/"$i; } } printf "%s",s; }'`
 echo "path is $PTH"
@@ -340,76 +358,88 @@ if [ "$PTH" == "." ]; then
     MPATH=`pwd`/modules.d
     TPATH=`pwd`/targets.d
     CPATH=`pwd`/toolchains
+    PTH=`pwd`
 else
     MPATH="$PTH/modules.d"
     TPATH="$PTH/targets.d"
     CPATH="$PTH/toolchains"
 fi
+# Adding extensions support
+if [ -d $PTH/extensions ]; then
+    if [ -d $PTH/extensions/modules.d ]; then
+	MPATH="$MPATH $PTH/extensions/modules.d"
+    fi
+    if [ -d $PTH/extensions/targets.d ]; then
+	TPATH="$MPATH $PTH/extensions/targets.d"
+    fi
+    if [ -d $PTH/extensions/toolchains ]; then
+	CPATH="$MPATH $PTH/extensions/toolchains"
+    fi
+fi
 
-tlist=`ls -C -1 $CPATH | grep .toolchain`
-for i in $tlist; do
-    TOOLCHAIN_NAME=`echo $i | sed 's/\.toolchain//'`
-    echo "toolchain name: $TOOLCHAIN_NAME file: $i "
-    if [ "$TOOLCHAIN_NAME" == "target" ]; then
-	echo "\"module\" is a reserved word, not for toolchains!"
-	exit 0
-    fi
-    if [ "$TOOLCHAIN_NAME" == "target" ]; then
-	echo "\"target\" is a reserved word, not for toolchains!"
-	exit 0
-    fi
-    source $CPATH/$i
-    INIT_FUNC=${TOOLCHAIN_NAME}_lock
-    $INIT_FUNC $TOOLCHAIN_NAME
-    TOOLCHAINS="$TOOLCHAIN_NAME $TOOLCHAINS"
+for TOOLCHAIN_SUBDIRS in $CPATH; do
+    tlist=`ls -C -1 $TOOLCHAIN_SUBDIRS | grep .toolchain`
+    for i in $tlist; do
+	TOOLCHAIN_NAME=`echo $i | sed 's/\.toolchain//'`
+	echo "toolchain name: $TOOLCHAIN_NAME file: $i "
+	if [ "$TOOLCHAIN_NAME" == "target" ]; then
+	    echo "\"module\" is a reserved word, not for toolchains!"
+	    exit 0
+	fi
+	if [ "$TOOLCHAIN_NAME" == "target" ]; then
+	    echo "\"target\" is a reserved word, not for toolchains!"
+	    exit 0
+	fi
+	source $TOOLCHAIN_SUBDIRS/$i
+	INIT_FUNC=${TOOLCHAIN_NAME}_lock
+	$INIT_FUNC $TOOLCHAIN_NAME
+	TOOLCHAINS="$TOOLCHAIN_NAME $TOOLCHAINS"
+    done
 done
 echo "[general] Available toolchains are $TOOLCHAINS"
 
-modlist=`ls -C -1 $MPATH  | grep .module`
-for i in $modlist; do
-    MOD_NAME=`echo $i | sed 's/\.module//'`
-    echo "module name: $MOD_NAME file: $i "
-    if [ "$MOD_NAME" == "target" ]; then
-	echo "\"target\" is a reserved word, not for module names!"
-	exit 0
-    fi
-    if [ "$MOD_NAME" == "toolchain" ]; then
-	echo "\"toolchain\" is a reserved word, not for module names!"
-	exit 0
-    fi
-    source $MPATH/$i
-    EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $MOD_NAME`
-    if [ $EN_COUNTER -eq 0 ]; then
-	INIT_FUNC=${MOD_NAME}_init
-	# Perform first-hand initialization process
-	INIT_RESULT=$($INIT_FUNC $MOD_NAME)
-	if [ $INIT_RESULT -eq 1 ]; then
-	    REINIT_LIST="$REINIT_LIST $MOD_NAME"
+for MODULE_SUBDIRS in $MPATH; do
+    modlist=`ls -C -1 $MODULE_SUBDIRS  | grep .module`
+    for i in $modlist; do
+	MOD_NAME=`echo $i | sed 's/\.module//'`
+	echo "module name: $MOD_NAME file: $i "
+	if [ "$MOD_NAME" == "target" ]; then
+	    echo "\"target\" is a reserved word, not for module names!"
+	    exit 0
 	fi
-	# fetch it
-	INIT_FUNC=${MOD_NAME}_fetch
-	$INIT_FUNC $MOD_NAME
-	MOD_LIST="$MOD_LIST $MOD_NAME"
-    fi
+	if [ "$MOD_NAME" == "toolchain" ]; then
+	    echo "\"toolchain\" is a reserved word, not for module names!"
+	    exit 0
+	fi
+	source $MODULE_SUBDIRS/$i
+	EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $MOD_NAME`
+	if [ $EN_COUNTER -eq 0 ]; then
+	    init_module_by_name $MOD_NAME
+	else
+	    echo "Blocked module skipped: $MOD_NAME"
+	fi
+    done
 done
 echo "[general] Modules discovered are: $MOD_LIST"
 
 
 echo "[general] Examining targets"
-targetlist=`ls -C -1 $TPATH | grep .target`
-for i in $targetlist; do
-    TARGET_NAME=`echo $i | sed 's/\.target//'`
-    echo "target name: $TARGET_NAME file: $i "
-    if [ "$TARGET_NAME" == "target" ]; then
-	echo "\"module\" is a reserved word, not for target names!"
-	exit 0
-    fi
-    if [ "$TARGET_NAME" == "toolchain" ]; then
-	echo "\"toolchain\" is a reserved word, not for target names!"
-	exit 0
-    fi
-    source $TPATH/$i
-    TARGET_LIST="$TARGET_NAME $TARGET_LIST"
+for TARGET_SUBDIRS in $TPATH; do
+    targetlist=`ls -C -1 $TPATH | grep .target`
+    for i in $targetlist; do
+	TARGET_NAME=`echo $i | sed 's/\.target//'`
+	echo "target name: $TARGET_NAME file: $i "
+	if [ "$TARGET_NAME" == "target" ]; then
+	    echo "\"module\" is a reserved word, not for target names!"
+	    exit 0
+	fi
+	if [ "$TARGET_NAME" == "toolchain" ]; then
+	    echo "\"toolchain\" is a reserved word, not for target names!"
+	    exit 0
+	fi
+	source $TPATH/$i
+	TARGET_LIST="$TARGET_NAME $TARGET_LIST"
+    done
 done
 echo "[general] Available targets are $TARGET_LIST"
 
@@ -424,16 +454,19 @@ for i in $@; do
 	    target)
 		if [ $IGNORE_TARGET -eq 0 ]; then
 		    TARGET_FUNC=${VAL}_execute
+		    echo "Target is set to $VAL"
 		fi
 		;;
 	    module)
 		BUILD_TARGET_MODULE=$VAL
+		echo "We will be building a module $VAL and target will be ignored"
 		IGNORE_TARGET=1
 		;;
 	    toolchain)
 		EN_COUNTER=`echo $TOOLCHAINS | grep -c $VAL`
 		if [ $VAL -gt 0 ]; then
 		    TOOLCHAIN=$VAL
+		    echo "Explicit toolchain $VAL specified, using it"
 		fi
 		;;
 	    trace)
@@ -456,30 +489,38 @@ if [ -d ${WORK_ROOT}/build ]; then
     if [ $TRACE_RUN -eq 0 ]; then
 	echo "Build directory exists, destroying ${WORK_ROOT}/build"
 	rm -fr ${WORK_ROOT}/build
+    else
+	echo "Trace run, no build directory cleanup performed"
     fi
 fi
 
+echo "We have [$BLOCKED_MODULES] modules blocked so far"
 
 for i in $MOD_LIST; do
     echo "[general] Processing $i module"
-    INIT_FUNC=${i}_actual
-    ACT_RESULT=$( $INIT_FUNC $i )
-    if [ $ACT_RESULT -eq 2 ]; then
-	echo "[$i] Actualization is not supported for the module"
-    else
-	echo "[$i] Actualization is supported for the module: $ACT_RESULT"
-	if [ $ACT_RESULT -eq 0 ]; then
-	    DEP_UP_LIST=$(get_dependents_recursive $i )
-	    for j in $DEP_UP_LIST; do
-		remove_from_list DEP_BUILT $j
-	    done
+    EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $i`
+    if [ $EN_COUNTER -eq 0 ]; then
+	INIT_FUNC=${i}_actual
+	ACT_RESULT=$( $INIT_FUNC $i )
+	if [ $ACT_RESULT -eq 2 ]; then
+	    echo "[$i] Actualization is not supported for the module"
+	else
+	    echo "[$i] Actualization is supported for the module: $ACT_RESULT"
+	    if [ $ACT_RESULT -eq 0 ]; then
+		DEP_UP_LIST=$(get_dependents_recursive $i )
+		for j in $DEP_UP_LIST; do
+		    remove_from_list DEP_BUILT $j
+		done
+	    fi
 	fi
-    fi
-    if [ $TRACE_RUN -eq 0 ]; then
-	# do the extraction
-	INIT_FUNC=${i}_extract
-	$INIT_FUNC $i
-	echo "[$i] extracted"
+	if [ $TRACE_RUN -eq 0 ]; then
+	    # do the extraction
+	    INIT_FUNC=${i}_extract
+	    $INIT_FUNC $i
+	    echo "[$i] extracted"
+	fi
+    else
+	echo "Blocked module skipped: $MOD_NAME"
     fi
 done
 if [ -z $REINIT_LIST ]; then
@@ -489,7 +530,7 @@ else
 fi
 
 if [ -z $BUILD_TARGET_MODULE ]; then
-    echo "no target modules available, using build target"
+    echo "no target modules available, using build target $TARGET_FUNC"
     if [ $IGNORE_TARGET -lt 1 ]; then
 	$TARGET_FUNC
     fi

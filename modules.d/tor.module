@@ -4,8 +4,6 @@
 TOR_VERSION=0.2.4.22
 TOR_ARCHIVE=tor-$TOR_VERSION.tar.gz
 TOR_URL=https://www.torproject.org/dist/$TOR_ARCHIVE
-
-
 tor_DEPENDENCIES="toolchain libnatpmp miniupnpc openssl libevent"
 
 function tor_init {
@@ -31,8 +29,8 @@ function tor_build {
 	if [ $G_VALID -lt 1 ]; then
 	    useradd -m -U -r tor
 	fi
-	./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
-	make -j4 &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking --enable-nat-pmp --enable-upnp --disable-asciidoc --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"
 }
@@ -43,6 +41,6 @@ function tor_actual {
 }
 
 function tor_getactualdependency {
-    echo ""
+    echo $tor_DEPENDENCIES
 }
 

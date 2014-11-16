@@ -1,0 +1,45 @@
+# GNU Make
+
+MAKE_VERSION=4.1
+MAKE_ARCHIVE=make-$MAKE_VERSION.tar.bz2
+MAKE_URL=http://ftp.gnu.org/gnu/make/$MAKE_ARCHIVE
+make_DEPENDENCIES="guile libffi gettext"
+
+function make_init {
+    echo "0"
+}
+
+function make_fetch {
+    arch_fetch $1 $MAKE_URL $MAKE_ARCHIVE
+}
+
+function make_extract {
+    arch_extract $1 $MAKE_ARCHIVE
+}
+
+function make_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    if [ $TRACE_RUN -eq 0 ]; then
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking --with-guile $ADDENDUM 2>&1 > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &>/dev/null
+    fi
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function make_actual {
+    local NOW_MAKE_VERSION=`make --version | grep "^GNU Make" | awk '{ print $3; }'`
+    if [ $NOW_MAKE_VERSION -eq $MAKE_VERSION ]; then
+	echo "1"
+    else
+	echo "0"
+    fi
+}
+
+function make_getactualdependency {
+    echo $make_DEPENDENCIES
+}
+

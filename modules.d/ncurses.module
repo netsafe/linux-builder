@@ -1,0 +1,57 @@
+# GNU ncurses library
+
+NCURSES_VERSION=5.9
+NCURSES_ARCHIVE=ncurses-$NCURSES_VERSION.tar.gz
+NCURSES_URL=http://ftp.gnu.org/pub/gnu/ncurses/$NCURSES_ARCHIVE
+
+ncurses_DEPENDENCIES=""
+
+
+function ncurses_init {
+    echo "0"
+}
+
+function ncurses_fetch {
+    arch_fetch $1 $NCURSES_URL $NCURSES_ARCHIVE
+}
+
+function ncurses_extract {
+    arch_extract $1 $NCURSES_ARCHIVE
+}
+
+function ncurses_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    if [ $TRACE_RUN -eq 0 ]; then
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-pc-files --with-shared --with-pthread --enable-pthreads-eintr --with-normal --enable-termcap --enable-sp-funcs --enable-sigwinch --enable-widec $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+	# post-install tweak for old apps ( like texinfo )
+	for lib in ncurses form panel menu ; do
+	    rm -vf                    $INSTALL_PREFIX/lib/lib${lib}.so
+	    echo "INPUT(-l${lib}tw)" > $INSTALL_PREFIX/lib/lib${lib}.so
+	    ln -sfv $INSTALL_PREFIX/lib/lib${lib}tw.a      $INSTALL_PREFIX/lib/lib${lib}.a
+	    ln -sfv $INSTALL_PREFIX/lib/${lib}tw.pc        $INSTALL_PREFIX/lib/pkgconfig/${lib}.pc
+	done
+
+	ln -sfv $INSTALL_PREFIX/lib/libncurses++tw.a $INSTALL_PREFIX/lib/libncurses++.a
+	rm -vf                     $INSTALL_PREFIX/lib/libcursesw.so
+	echo "INPUT(-lncursestw)" > $INSTALL_PREFIX/lib/libcursesw.so
+	ln -sfv $INSTALL_PREFIX/lib/libncurses.so      $INSTALL_PREFIX/lib/libcurses.so
+	ln -sfv $INSTALL_PREFIX/lib/libncursestw.a      $INSTALL_PREFIX/lib/libcursesw.a
+	ln -sfv $INSTALL_PREFIX/lib/libncursestw.a       $INSTALL_PREFIX/lib/libcurses.a
+    fi
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function ncurses_actual {
+    # grep NCURSES_VERSION_STRING include/ncurses_cfg.h | awk '{ print $3; }' | sed 's/\"//g' vs /usr/bin/ncursestw6-config --version
+    echo "2"
+}
+
+function ncurses_getactualdependency {
+    echo $ncurses_DEPENDENCIES
+}
+

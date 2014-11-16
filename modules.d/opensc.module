@@ -22,8 +22,8 @@ function opensc_build {
     cd $WORK_ROOT/build/$1
     if [ $TRACE_RUN -eq 0 ]; then
 	./bootstrap &> ${WORK_ROOT}/logs/$1-bootstrap.log
-	./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
-	make -j4 &> ${WORK_ROOT}/logs/$1.log && make install &> /dev/null
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking --disable-man --with-pic=all --enable-openct --disable-pcsc --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"
 }

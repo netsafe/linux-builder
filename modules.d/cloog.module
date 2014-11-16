@@ -26,8 +26,8 @@ function cloog_build {
     fi
     cd $WORK_ROOT/build/$1
     if [ $TRACE_RUN -eq 0 ]; then
-	./configure --prefix=$INSTALL_PREFIX --with-isl=bundled --with-gmp-prefix=$INSTALL_PREFIX --enable-dependency-tracking --with-pic $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
-	make -j4 &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --with-isl=bundled --with-gmp-prefix=$INSTALL_PREFIX --enable-dependency-tracking --with-pic $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"
 }

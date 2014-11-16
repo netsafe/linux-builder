@@ -1,0 +1,30 @@
+# GNU Portability Library
+
+gnulib_DEPENDENCIES=""
+
+
+function gnulib_init {
+    echo "0"
+}
+
+function gnulib_fetch {
+    git_fetch $1 git://git.savannah.gnu.org/gnulib.git
+}
+
+function gnulib_extract {
+    git_extract $1
+}
+
+function gnulib_build {
+    # We need just to fetch it
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function gnulib_actual {
+    echo "2"
+}
+
+function gnulib_getactualdependency {
+    echo $gnulib_DEPENDENCIES
+}
+

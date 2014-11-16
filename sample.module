@@ -37,6 +37,6 @@ function sample_actual {
 }
 
 function sample_getactualdependency {
-    echo sample_DEPENDENCIES
+    echo $sample_DEPENDENCIES
 }
 

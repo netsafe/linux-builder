@@ -1,0 +1,39 @@
+
+# The Boehm-Demers-Weiser conservative C/C++ Garbage Collector
+
+bdwgc_DEPENDENCIES=" libffi libatomic_ops "
+
+function bdwgc_init {
+    echo "0"
+}
+
+function bdwgc_fetch {
+    git_fetch $1 https://github.com/ivmai/bdwgc.git
+}
+
+function bdwgc_extract {
+    git_extract $1
+}
+
+function bdwgc_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    if [ $TRACE_RUN -eq 0 ]; then
+	./autogen.sh
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking --enable-threads=posix --enable-parallel-mark --enable-cplusplus $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+    fi
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function bdwgc_actual {
+	echo "2"
+}
+
+function bdwgc_getactualdependency {
+    echo $bdwgc_DEPENDENCIES
+}
+

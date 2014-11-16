@@ -1,0 +1,39 @@
+# GNU Gperf
+
+gperf_DEPENDENCIES="texlive gnulib"
+
+
+function gperf_init {
+    echo "0"
+}
+
+function gperf_fetch {
+    git_fetch $1 git://git.savannah.gnu.org/gperf.git
+}
+
+function gperf_extract {
+    git_extract $1
+}
+
+function gperf_build {
+    local ADDENDUM=""
+    if [ $USE_TOOLCHAIN -gt 0 ]; then
+	$ADDENDUM="CC=$CC CXX=$CXX CPP=$CPP CFLAGS=\"$CFLAGS\" CPPFLAGS=\"$CPPFLAGS\" CXXFLAGS=\"$CXXFLAGS\" LD=$LD LDFLAGS=\"$LDFLAGS\" "
+    fi
+    cd $WORK_ROOT/build/$1
+    if [ $TRACE_RUN -eq 0 ]; then
+	GNULIB_TOOL="${WORK_ROOT}/build/gnulib/gnulib-tool " PREFIX=$INSTALL_PREFIX ./autogen.sh &> ${WORK_ROOT}/logs/$1-autoconf.log
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
+    fi
+    DEP_BUILT="$1 $DEP_BUILT"
+}
+
+function gperf_actual {
+    echo "2"
+}
+
+function gperf_getactualdependency {
+    echo $gperf_DEPENDENCIES
+}
+

@@ -3,7 +3,7 @@
 openct_DEPENDENCIES="toolchain libusb_compat"
 
 function openct_init {
-    service openct stop
+    service openct stop >/dev/null 2>&1
     echo "0"
 }
 
@@ -23,8 +23,8 @@ function openct_build {
     cd $WORK_ROOT/build/$1
     if [ $TRACE_RUN -eq 0 ]; then
 	./bootstrap &> ${WORK_ROOT}/logs/$1-bootstrap.log
-	./configure --prefix=$INSTALL_PREFIX --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
-	make -j4 &> ${WORK_ROOT}/logs/$1.log && make install &> /dev/null
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --enable-dependency-tracking --enable-usb --enable-non-privileged --with-pic=all --sysconfdir=/etc --localstatedir=/var $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install &> /dev/null
 	cp etc/init-script /etc/init.d/openct
 	ln -s /etc/init.d/openct /etc/rc0.d/K50openct
 	ln -s /etc/init.d/openct /etc/rc1.d/S50openct
@@ -48,7 +48,7 @@ function openct_build {
 	if [ $G_VALID -lt 1 ]; then
 	    useradd -m -U -r openctd
 	fi
-	service openct start
+	service openct start &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"
 }

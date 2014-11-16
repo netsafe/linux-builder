@@ -1,0 +1,5 @@
+WORK_ROOT=/usr/work
+INSTALL_PREFIX=/usr
+ARCH_DIR=$WORK_ROOT/archive
+REPO_DIR=$WORK_ROOT/repo
+NO_SCM=0

@@ -35,7 +35,7 @@ function zlib_build {
     fi
     cd $WORK_ROOT/build/$1
     if [ $TRACE_RUN -eq 0 ]; then
-	./configure --prefix=$INSTALL_PREFIX $ZTK > ${WORK_ROOT}/logs/$1-configure.log
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var $ZTK > ${WORK_ROOT}/logs/$1-configure.log
 	make &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
     fi
     if [ $USE_TOOLCHAIN -gt 0 ]; then

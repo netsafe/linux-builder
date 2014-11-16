@@ -1,8 +1,21 @@
 #!/bin/bash
 
+# Where are we?
+PTH=`echo $0 | awk -F "/" '{ s="" ; for(i=1;i<NF;i++){ if(i==1){ s=$i; } else { s=s"/"$i; } } printf "%s",s; }'`
+echo "path is $PTH"
 
-WORK_ROOT=/usr/work
-INSTALL_PREFIX=/usr
+CFGFILE=$PTH/config
+
+if [ -r $CFGFILE ]; then
+    source $CFGFILE
+else
+    WORK_ROOT=/usr/work
+    INSTALL_PREFIX=/usr
+    ARCH_DIR=$WORK_ROOT/archive
+    REPO_DIR=$WORK_ROOT/repo
+    JOBS=8
+    NO_SCM=0
+fi
 
 # Toolchain-specific variables
 TOOLCHAIN=""
@@ -28,10 +41,10 @@ IGNORE_TARGET=0
 BLOCKED_MODULES=""
 TRACE_RUN=0
 
-if [ -d ${WORK_ROOT}/archive ]; then
+if [ -d $ARCH_DIR ]; then
     echo "Work directory exists"
 else
-    mkdir -p ${WORK_ROOT}/archive
+    mkdir -p $ARCH_DIR
 fi
 
 if [ -d ${WORK_ROOT}/logs ]; then
@@ -41,10 +54,10 @@ else
 fi
 
 
-if [ -d ${WORK_ROOT}/repo ]; then
+if [ -d $REPO_DIR ]; then
     echo "Repo directory exists"
 else
-    mkdir -p ${WORK_ROOT}/repo
+    mkdir -p $REPO_DIR
 fi
 
 
@@ -81,14 +94,16 @@ function get_dependents {
 # Usage: git_fetch <module_name> <git_scm_url>
 function git_fetch {
     local GIT_URL=$2
-    local FOLDER_PATH=${WORK_ROOT}/repo/$1
+    local FOLDER_PATH=$REPO_DIR/$1
     if [ -d $FOLDER_PATH ]; then
-	echo "[$1] SCM repo exists, updating"
-	cd $FOLDER_PATH
-	git pull
+	if [ $NO_SCM -eq 0 ]; then
+	    echo "[$1] SCM repo exists, updating"
+	    cd $FOLDER_PATH
+	    git pull
+	fi
     else
 	echo "[$1]: fetching from SCM"
-	cd ${WORK_ROOT}/repo
+	cd $REPO_DIR
 	git clone $GIT_URL $1
     fi
 }
@@ -96,19 +111,19 @@ function git_fetch {
 # Usage: arch_fetch <module_name> <archive_url> <archive_file_name>
 function arch_fetch {
     local ARCH_URL=$2
-    local FILE_PATH=$WORK_ROOT/archive/$3
+    local FILE_PATH=$ARCH_DIR/$3
     if [ -f $FILE_PATH ]; then
 	echo "[$1] archive file exists"
     else
 	echo "[$1] archive not found, fetching"
-	cd ${WORK_ROOT}/archive
+	cd $ARCH_DIR
 	wget -O $3 $ARCH_URL
     fi
 }
 
 # Usage: git_extract <module_name>
 function git_extract {
-    local FOLDER_PATH=$WORK_ROOT/repo/$1
+    local FOLDER_PATH=$REPO_DIR/$1
     if [ -d $FOLDER_PATH ]; then
 	cd $FOLDER_PATH
 	echo "[$1] Git SCM extract for $1 to $WORK_ROOT/build/$1/"
@@ -121,8 +136,12 @@ function git_extract {
 
 # Usage: arch_extract <module_name> <archive_file_name>
 function arch_extract {
-    local FILE_PATH=${WORK_ROOT}/archive/$2
-    local DESTINATION=${WORK_ROOT}/build/$1
+    local FILE_PATH=$ARCH_DIR/$2
+    if [ -z $3 ]; then
+	local DESTINATION=${WORK_ROOT}/build/$1
+    else
+	local DESTINATION=$3
+    fi
     if [ -f $FILE_PATH ]; then
 	echo "[$1] archive exists, extracting $2 to $DESTINATION"
 	mkdir -p $DESTINATION
@@ -206,6 +225,7 @@ function build_module_recursive {
 		    if [ $DCNT -lt 1 ]; then
 			echo "[$MODULE_NAME][$DCNT][$BUILT_DEP] calling directly $BUILD_FUNCTION due to an empty dependency list"
 			$BUILD_FUNCTION $MODULE_NAME
+			ldconfig
 		    fi
 		fi
 	else
@@ -213,6 +233,7 @@ function build_module_recursive {
 	    BUILD_FUNCTION=${MODULE_NAME}_build
 	    echo "[$MODULE_NAME] calling directly $BUILD_FUNCTION"
 	    $BUILD_FUNCTION $MODULE_NAME
+	    ldconfig
 	fi
     fi
 }
@@ -285,6 +306,7 @@ function add_to_list_helper {
 	    eval $LIST_NAME="\"$TMP_COPY $TOKEN\""
 	fi
     fi
+    echo "Adding+help $2 to $1 [${!LIST_NAME}] $FLAG" >> /tmp/addlog
     echo $FLAG
 }
 
@@ -316,19 +338,25 @@ function get_dependents_recursive {
     local CZ=0
     local XT=""
 
-    TEMPORARY_LIST=$(get_dependents $MODULE_NAME )
+    local TEMPORARY_LIST=$(get_dependents $MODULE_NAME )
+    echo "[$MODULE_NAME] TEMPORARY_LIST is $TEMPORARY_LIST " >> /tmp/recdep
     while [ $C -gt 0 ]; do
 	CT=0
 	for i in $TEMPORARY_LIST; do
 	    XT=$(get_dependents $i )
+	    echo "[$MODULE_NAME] $i : XT is $XT " >> /tmp/recdep
 	    for j in $XT; do
 		CZ=$(add_to_list_helper TEMPORARY_LIST $j)
-		CT=$(( $CT + $CZ ))
+		# CT=$(( $CT + $CZ ))
 	    done
-	    if [ $CT -eq 0 ]; then
+	    if [ $CZ -eq 0 ]; then
 		C=0
+	    else
+		C=1
 	    fi
+	    echo "[$MODULE_NAME] $i : CT is $CT " >> /tmp/recdep
 	done
+	echo "[$MODULE_NAME] end for : TEMPORARY_LIST is $TEMPORARY_LIST " >> /tmp/recdep
     done
     echo $TEMPORARY_LIST
 }
@@ -340,6 +368,7 @@ function init_module_by_name {
 	INIT_FUNC=${MODULE_NAME}_init
 	# Perform first-hand initialization process
 	INIT_RESULT=$($INIT_FUNC $MODULE_NAME)
+	echo "[$MODULE_NAME] init result $INIT_RESULT"
 	if [ $INIT_RESULT -eq 1 ]; then
 	    REINIT_LIST="$REINIT_LIST $MODULE_NAME"
 	fi
@@ -352,8 +381,7 @@ function init_module_by_name {
 
 
 # Making some preparations - scanning for module definitions in modules.d folder
-PTH=`echo $0 | awk -F "/" '{ s="" ; for(i=1;i<NF;i++){ if(i==1){ s=$i; } else { s=s"/"$i; } } printf "%s",s; }'`
-echo "path is $PTH"
+
 if [ "$PTH" == "." ]; then
     MPATH=`pwd`/modules.d
     TPATH=`pwd`/targets.d
@@ -364,6 +392,7 @@ else
     TPATH="$PTH/targets.d"
     CPATH="$PTH/toolchains"
 fi
+
 # Adding extensions support
 if [ -d $PTH/extensions ]; then
     if [ -d $PTH/extensions/modules.d ]; then
@@ -472,6 +501,9 @@ for i in $@; do
 	    trace)
 		TRACE_RUN=$VAL
 		;;
+	    noscm)
+		NO_SCM=$VAL
+		;;
 	esac
     fi
 done
@@ -480,6 +512,12 @@ if [ -z $TOOLCHAIN ]; then
     echo "[general] no toolchains specified, using gnu"
     # Don't change it here, or you'll be expelled from Hogwards! Use --target=xxx instead
     TOOLCHAIN=gnu
+fi
+
+if [ $IGNORE_TARGET -lt 1 ]; then
+    if [ -z $TARGET_FUNC ]; then
+	TARGET_FUNC=fullcycle_execute
+    fi
 fi
 
 INIT_FUNC=${TOOLCHAIN}_toolchain
@@ -505,12 +543,17 @@ for i in $MOD_LIST; do
 	if [ $ACT_RESULT -eq 2 ]; then
 	    echo "[$i] Actualization is not supported for the module"
 	else
-	    echo "[$i] Actualization is supported for the module: $ACT_RESULT"
+	    echo "[$i] Actualization is supported for the module: $ACT_RESULT "
 	    if [ $ACT_RESULT -eq 0 ]; then
+		echo "[$i] Looking for upward dependencies"
 		DEP_UP_LIST=$(get_dependents_recursive $i )
+		echo "[$i] Actualization requrement, dependents are : $DEP_UP_LIST "
 		for j in $DEP_UP_LIST; do
+		    echo "[$i] Removing dep $j"
 		    remove_from_list DEP_BUILT $j
 		done
+	    else
+		echo "[$i] Module is up-to-date"
 	    fi
 	fi
 	if [ $TRACE_RUN -eq 0 ]; then

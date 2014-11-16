@@ -23,7 +23,7 @@ function libusb_compat_build {
     cd $WORK_ROOT/build/$1
     if [ $TRACE_RUN -eq 0 ]; then
 	./autogen.sh &> ${WORK_ROOT}/logs/$1-autogen.log
-	./configure --prefix=$INSTALL_PREFIX --with-pic=all --enable-dependency-tracking --enable-debug-log $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	./configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --with-pic=all --enable-dependency-tracking --enable-debug-log $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
 	make &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"

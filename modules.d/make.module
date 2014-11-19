@@ -32,7 +32,7 @@ function make_build {
 
 function make_actual {
     local NOW_MAKE_VERSION=`make --version | grep "^GNU Make" | awk '{ print $3; }'`
-    if [ $NOW_MAKE_VERSION -eq $MAKE_VERSION ]; then
+    if [ $NOW_MAKE_VERSION == $MAKE_VERSION ]; then
 	echo "1"
     else
 	echo "0"

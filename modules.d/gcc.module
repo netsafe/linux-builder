@@ -26,7 +26,7 @@ function gcc_build {
     mkdir build
     cd build
     if [ $TRACE_RUN -eq 0 ]; then
-	${WORK_ROOT}/build/$1/build/configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,objc,obj-c++ --disable-java --disable-libjava --with-mpc=$INSTALL_PREFIX --with-gmp=$INSTALL_PREFIX --with-mpfr=$INSTALL_PREFIX --with-cloog=$INSTALL_PREFIX --enable-objc-gc --enable-stage1-languages=c,c++,objc,obj-c++ --enable-lto --enable-ld=yes --enable-gold=yes --enable-decimal-float=yes --with-arch=native --enable-tls --enable-threads --enable-multilib --enable-dependency-tracking --enable-targets=all $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
+	${WORK_ROOT}/build/$1/configure --prefix=$INSTALL_PREFIX --sysconfdir=/etc --localstatedir=/var --program-suffix=-trunk --enable-graphite --enable-languages=c,c++,objc,obj-c++ --disable-java --disable-libjava --with-mpc=$INSTALL_PREFIX --with-gmp=$INSTALL_PREFIX --with-mpfr=$INSTALL_PREFIX --with-cloog=$INSTALL_PREFIX --enable-objc-gc --enable-stage1-languages=c,c++,objc,obj-c++ --enable-lto --enable-ld=yes --enable-gold=yes --enable-decimal-float=no --enable-tls --enable-threads --enable-multilib --enable-dependency-tracking --enable-targets=all $ADDENDUM > ${WORK_ROOT}/logs/$1-configure.log
 	make -j${JOBS} &> ${WORK_ROOT}/logs/$1.log && make install clean &> /dev/null
     fi
     DEP_BUILT="$1 $DEP_BUILT"

@@ -15,6 +15,7 @@ else
     REPO_DIR=$WORK_ROOT/repo
     JOBS=8
     NO_SCM=0
+    BUILD_PRESERVE=0
 fi
 
 # Toolchain-specific variables
@@ -128,6 +129,12 @@ function git_extract {
     if [ -d $FOLDER_PATH ]; then
 	cd $FOLDER_PATH
 	echo "[$1] Git SCM extract for $1 to $WORK_ROOT/build/$1/"
+	if [ $BUILD_PRESERVE -gt 0 ]; then
+	    local DESIRED_DIR_NAME=$WORK_ROOT/build/$1
+	    if [ -d $DESIRED_DIR_NAME ]; then
+		rm -fr $DESIRED_DIR_NAME
+	    fi
+	fi
 	git checkout-index -f -a --prefix=$WORK_ROOT/build/$1/
     else
 	echo "[$1] No SCM repository exists, exiting!"
@@ -135,9 +142,15 @@ function git_extract {
     fi
 }
 
-# Usage: arch_extract <module_name> <archive_file_name>
+# Usage: arch_extract <module_name> <archive_file_name> <destination_dir> <strip_level>
 function arch_extract {
     local FILE_PATH=$ARCH_DIR/$2
+    local STRIP_LEVEL=1
+    if [ -z $4 ]; then
+	STRIP_LEVEL=1
+    else
+	STRIP_LEVEL=$4
+    fi
     if [ -z $3 ]; then
 	local DESTINATION=${WORK_ROOT}/build/$1
     else
@@ -145,8 +158,13 @@ function arch_extract {
     fi
     if [ -f $FILE_PATH ]; then
 	echo "[$1] archive exists, extracting $2 to $DESTINATION"
+	if [ $BUILD_PRESERVE -gt 0 ]; then
+	    if [ -d $DESTINATION ]; then
+		rm -fr $DESTINATION
+	    fi
+	fi
 	mkdir -p $DESTINATION
-	tar xf $FILE_PATH -C $DESTINATION --strip-components=1 
+	tar xf $FILE_PATH -C $DESTINATION --strip-components=$STRIP_LEVEL 
     else
 	echo "[$1] archive file $2 not found, exiting!"
 	exit 0
@@ -408,7 +426,7 @@ if [ -d $PTH/extensions ]; then
 fi
 
 for TOOLCHAIN_SUBDIRS in $CPATH; do
-    tlist=`ls -C -1 $TOOLCHAIN_SUBDIRS | grep .toolchain`
+    tlist=`ls -C -1 $TOOLCHAIN_SUBDIRS | grep \\\\.toolchain`
     for i in $tlist; do
 	TOOLCHAIN_NAME=`echo $i | sed 's/\.toolchain//'`
 	echo "toolchain name: $TOOLCHAIN_NAME file: $i "
@@ -429,7 +447,7 @@ done
 echo "[general] Available toolchains are $TOOLCHAINS"
 
 for MODULE_SUBDIRS in $MPATH; do
-    modlist=`ls -C -1 $MODULE_SUBDIRS  | grep .module`
+    modlist=`ls -C -1 $MODULE_SUBDIRS  | grep \\\\.module`
     for i in $modlist; do
 	MOD_NAME=`echo $i | sed 's/\.module//'`
 	echo "module name: $MOD_NAME file: $i "
@@ -455,7 +473,7 @@ echo "[general] Modules discovered are: $MOD_LIST"
 
 echo "[general] Examining targets"
 for TARGET_SUBDIRS in $TPATH; do
-    targetlist=`ls -C -1 $TPATH | grep .target`
+    targetlist=`ls -C -1 $TPATH | grep \\\\.target`
     for i in $targetlist; do
 	TARGET_NAME=`echo $i | sed 's/\.target//'`
 	echo "target name: $TARGET_NAME file: $i "
@@ -532,8 +550,10 @@ $INIT_FUNC
 
 if [ -d ${WORK_ROOT}/build ]; then
     if [ $TRACE_RUN -eq 0 ]; then
-	echo "Build directory exists, destroying ${WORK_ROOT}/build"
-	#rm -fr ${WORK_ROOT}/build
+	if [ $BUILD_PRESERVE -lt 1 ]; then
+	    echo "Build directory exists, destroying ${WORK_ROOT}/build"
+	    rm -fr ${WORK_ROOT}/build
+	fi
     else
 	echo "Trace run, no build directory cleanup performed"
     fi

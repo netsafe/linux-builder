@@ -28,7 +28,7 @@ function texlive_extract {
 	    ln -s $INSTALL_PREFIX/share/texmf /texmf
 	fi
     else
-	arch_extract $1 $TEXLIVE_MF_ARCHIVE $INSTALL_PREFIX/share/texmf
+	arch_extract $1 $TEXLIVE_MF_ARCHIVE $INSTALL_PREFIX/share/texmf 2
 	ln -s $INSTALL_PREFIX/share/texmf /texmf
     fi
 }

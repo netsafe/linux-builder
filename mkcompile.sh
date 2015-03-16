@@ -37,6 +37,7 @@ MOD_LIST=""
 TARGET_LIST=""
 TEMPORARY_LIST=""
 BUILD_TARGET_MODULE=""
+MODULE_RECURSIVE=0
 IGNORE_TARGET=0
 BLOCKED_MODULES=""
 TRACE_RUN=0
@@ -491,6 +492,12 @@ for i in $@; do
 		echo "We will be building a module $VAL and target will be ignored"
 		IGNORE_TARGET=1
 		;;
+	    modulechain)
+		BUILD_TARGET_MODULE=$VAL
+		MODULE_RECURSIVE=1
+		echo "We will be building up toward a module $VAL and target will be ignored"
+		IGNORE_TARGET=1
+		;;
 	    toolchain)
 		EN_COUNTER=`echo $TOOLCHAINS | grep -c $VAL`
 		if [ $VAL -gt 0 ]; then
@@ -526,7 +533,7 @@ $INIT_FUNC
 if [ -d ${WORK_ROOT}/build ]; then
     if [ $TRACE_RUN -eq 0 ]; then
 	echo "Build directory exists, destroying ${WORK_ROOT}/build"
-	rm -fr ${WORK_ROOT}/build
+	#rm -fr ${WORK_ROOT}/build
     else
 	echo "Trace run, no build directory cleanup performed"
     fi
@@ -579,8 +586,12 @@ if [ -z $BUILD_TARGET_MODULE ]; then
     fi
 else
     echo "building precisely the module named $BUILD_TARGET_MODULE"
-    INIT_FUNC=${BUILD_TARGET_MODULE}_build
-    $INIT_FUNC $BUILD_TARGET_MODULE
+    if [ MODULE_RECURSIVE -lt 1 ]; then
+	INIT_FUNC=${BUILD_TARGET_MODULE}_build
+	$INIT_FUNC $BUILD_TARGET_MODULE
+    else
+	build_module_recursive ${BUILD_TARGET_MODULE}
+    fi
 fi
 echo "[general] Modules built: $DEP_BUILT"
 echo "[general] Finishing"

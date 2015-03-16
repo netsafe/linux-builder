@@ -22,6 +22,8 @@ target=fullcycle - full run. Need to be done if it's a first time you're doing i
 target=mini - minimal assembly, GMP, OpenSSL and Tor
 target=cron - just Tor, with patches
 trace=1 - just run trace
+module=<module name> - just build exactly the module specified
+moduletarget=<module name> - build the module specified along with all pre-requisites
 
 Русская версия:
 
@@ -40,4 +42,8 @@ target=fullcycle сборка. Это НЕОБХОДИМО сделать в п�
 target=mini - пересборка по минимуму, GMP, OpenSSL и сам Tor
 target=cron - только Tor, с патчами
 trace=1 - протрассировать без сборки
+module=<module name> - собрать только указанный модуль
+moduletarget=<module name> - собрать все зависимости для модуля и сам модуль
+
+
 ```

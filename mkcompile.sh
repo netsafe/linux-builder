@@ -597,7 +597,7 @@ for i in $MOD_LIST; do
 	    fi
 	fi
 	if [ $TRACE_RUN -eq 0 ]; then
-	    if [ $FULL_EXTRATION_FIRST -gt 0 ]; then
+	    if [ $FULL_EXTRACTION_FIRST -gt 0 ]; then
 		# do the extraction
 		INIT_FUNC=${i}_extract
 		$INIT_FUNC $i

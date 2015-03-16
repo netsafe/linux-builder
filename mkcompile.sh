@@ -16,6 +16,7 @@ else
     JOBS=8
     NO_SCM=0
     BUILD_PRESERVE=0
+    FULL_EXTRACTION_FIRST=1
 fi
 
 # Toolchain-specific variables
@@ -239,6 +240,10 @@ function build_module_recursive {
 			build_module_recursive $MODULE_NAME "$DEPLIST"
 		    fi
 		else
+		    if [ $FULL_EXTRACTION_FIRST -lt 1 ]; then
+			INIT_FUNC=${MODULE_NAME}_extract
+			$INIT_FUNC $MODULE_NAME
+		    fi
 		    BUILD_FUNCTION=${MODULE_NAME}_build
 		    DCNT=`echo "$DEP_BUILT" | grep -c $MODULE_NAME`
 		    if [ $DCNT -lt 1 ]; then
@@ -248,6 +253,10 @@ function build_module_recursive {
 		    fi
 		fi
 	else
+	    if [ $FULL_EXTRACTION_FIRST -lt 1 ]; then
+		INIT_FUNC=${MODULE_NAME}_extract
+		$INIT_FUNC $MODULE_NAME
+	    fi
 	    # Module has no further dependencies, so build it!
 	    BUILD_FUNCTION=${MODULE_NAME}_build
 	    echo "[$MODULE_NAME] calling directly $BUILD_FUNCTION"
@@ -277,6 +286,10 @@ function build_available {
 		EN_COUNTER=`echo "$BLOCKED_MODULES" | grep -c $BUILD_CANDIDATE`
 		if [ $EN_COUNTER -eq 0 ]; then
 		    # Module is not built yet, so we need to build it
+		    if [ $FULL_EXTRACTION_FIRST -lt 1 ]; then
+			INIT_FUNC=${BUILD_CANDIDATE}_extract
+			$INIT_FUNC $BUILD_CANDIDATE
+		    fi
 		    BUILD_FUNCTION=${BUILD_CANDIDATE}_build
 		    echo "[$MODULE_NAME][$BUILD_COUNTER] calling $BUILD_FUNCTION Built list is [$DEP_BUILT]"
 		    $BUILD_FUNCTION $BUILD_CANDIDATE
@@ -510,7 +523,7 @@ for i in $@; do
 		echo "We will be building a module $VAL and target will be ignored"
 		IGNORE_TARGET=1
 		;;
-	    modulechain)
+	    moduletarget)
 		BUILD_TARGET_MODULE=$VAL
 		MODULE_RECURSIVE=1
 		echo "We will be building up toward a module $VAL and target will be ignored"
@@ -584,10 +597,12 @@ for i in $MOD_LIST; do
 	    fi
 	fi
 	if [ $TRACE_RUN -eq 0 ]; then
-	    # do the extraction
-	    INIT_FUNC=${i}_extract
-	    $INIT_FUNC $i
-	    echo "[$i] extracted"
+	    if [ $FULL_EXTRATION_FIRST -gt 0 ]; then
+		# do the extraction
+		INIT_FUNC=${i}_extract
+		$INIT_FUNC $i
+		echo "[$i] extracted"
+	    fi
 	fi
     else
 	echo "Blocked module skipped: $MOD_NAME"
@@ -607,6 +622,10 @@ if [ -z $BUILD_TARGET_MODULE ]; then
 else
     echo "building precisely the module named $BUILD_TARGET_MODULE"
     if [ MODULE_RECURSIVE -lt 1 ]; then
+	if [ $FULL_EXTRACTION_FIRST -lt 1 ]; then
+	    INIT_FUNC=${BUILD_TARGET_MODULE}_extract
+	    $INIT_FUNC $BUILD_TARGET_MODULE
+	fi
 	INIT_FUNC=${BUILD_TARGET_MODULE}_build
 	$INIT_FUNC $BUILD_TARGET_MODULE
     else

@@ -1,7 +1,7 @@
 
 # The Onion Router
 
-TOR_VERSION=0.2.4.22
+TOR_VERSION=0.2.6.8
 TOR_ARCHIVE=tor-$TOR_VERSION.tar.gz
 TOR_URL=https://www.torproject.org/dist/$TOR_ARCHIVE
 tor_DEPENDENCIES="toolchain libnatpmp miniupnpc openssl libevent"

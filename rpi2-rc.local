@@ -1,0 +1,148 @@
+root@ubuntu:~# cat /etc/rc.local
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+
+# Print the IP address
+_IP=$(hostname -I) || true
+if [ "$_IP" ]; then
+  printf "My IP address is %s\n" "$_IP"
+fi
+
+# hardware RTC
+echo ds1307 0x68 > /sys/class/i2c-adapter/i2c-1/new_device
+
+# Atheros workaround https://github.com/qca/open-ath9k-htc-firmware/issues/72
+ADRV=`lsmod | grep -c ath9k_htc`
+if [ $ADRV -gt 0 ]; then
+    ATH_DEVLIST=`ls /sys/class/leds/ath9k_htc-phy*/trigger`
+    for ath9k_device_to_fix in $ATH_DEVLIST; do
+        echo none > $ath9k_device_to_fix
+    done
+fi
+
+# Explicitly rise the limit of open files/connection descriptors
+ulimit -n 60000
+
+chmod 777 /run
+chmod 777 /var/run
+
+# get a date
+/usr/sbin/ntpdate -4 90.184.222.114
+
+# make a swap
+/sbin/modprobe zram num_devices=1
+echo 67108864  > /sys/block/zram0/disksize
+/sbin/mkswap /dev/zram0
+/sbin/swapon /dev/zram0 -p 10
+
+# start Invisible Internet Project node
+cd /usr/i2p
+nice -n -12 su i2p -c /usr/i2p/runplain.sh
+
+# start Tor node
+cd /usr/tor
+/usr/bin/screen -d -m -S tor nice -n -12 /usr/tor/bin/tor -f /etc/torrc
+
+# A modified script from https://trac.torproject.org/projects/tor/wiki/doc/TransparentProxy
+### set variables
+#destinations you don't want routed through Tor
+_non_tor="192.168.0.0/24 192.168.13.0/24"
+_tor_map="10.192.0.0/10"
+_i2p_port="22592"
+_tor_port="443"
+
+
+#the UID that Tor runs as (varies from system to system)
+_tor_uid=`id -u tor`
+_i2p_uid=`id -u i2p`
+_bind_uid=`id -u bind`
+
+# Tor mappings - a must-have tunnel! Regardless of the UID - it is only available via Tor
+#iptables -t nat -A OUTPUT -m owner --uid-owner $_tor_uid -j RETURN
+#iptables -t nat -A OUTPUT -d $_tor_map -p tcp -j REDIRECT --to-ports 9040
+
+
+# all the owners allowed to pass directly
+_uid_arr="0 $_tor_uid $_i2p_uid $_bind_uid"
+
+#Tor's TransPort
+_trans_port="9040"
+
+#your internal interface
+_int_if="wlan0"
+
+# outbound interface [ we're reaching an outer world through it ]
+_out_if="eth0"
+
+### flush iptables
+iptables -F
+iptables -t nat -F
+
+### set iptables *nat
+iptables -t nat -A OUTPUT -o lo -j RETURN
+for _uid_to_pass in $_uid_arr; do
+    iptables -t nat -A OUTPUT -m owner --uid-owner $_uid_to_pass -j RETURN
+    iptables -I OUTPUT -o eth0 -m owner --uid-owner $_uid_to_pass -d 0.0.0.0/0 -j ACCEPT
+done
+iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 53
+
+#allow clearnet access for hosts in $_non_tor
+for _clearnet in $_non_tor; do
+   iptables -t nat -A OUTPUT -d $_clearnet -j RETURN
+   iptables -t nat -A PREROUTING -i $_int_if -d $_clearnet -j RETURN
+done
+
+#redirect all other pre-routing and output to Tor
+iptables -t nat -A OUTPUT -p tcp --syn  -j REDIRECT --to-ports $_trans_port
+iptables -t nat -A PREROUTING -i $_int_if -p udp --dport 53 -j REDIRECT --to-ports 53
+iptables -t nat -A PREROUTING -i $_int_if -p tcp --syn -j REDIRECT --to-ports $_trans_port
+
+### set iptables *filter
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#allow clearnet access for hosts in $_non_tor
+for _clearnet in $_non_tor 127.0.0.0/8; do
+ iptables -A OUTPUT -d $_clearnet -j ACCEPT
+done
+
+# Warning#1
+iptables -I OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,FIN ACK,FIN -j DROP
+iptables -I OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,RST ACK,RST -j DROP
+
+# Warning#2
+#iptables -A OUTPUT -m conntrack --ctstate INVALID -j LOG --log-prefix "Transproxy ctstate leak blocked: " --log-uid
+iptables -A OUTPUT -m conntrack --ctstate INVALID -j DROP
+iptables -A OUTPUT -m state --state INVALID -j LOG --log-prefix "Transproxy state leak blocked: " --log-uid
+iptables -A OUTPUT -m state --state INVALID -j DROP
+
+iptables -A OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,FIN ACK,FIN -j LOG --log-prefix "Transproxy leak blocked: " --log-uid
+iptables -A OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,RST ACK,RST -j LOG --log-prefix "Transproxy leak blocked: " --log-uid
+iptables -A OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,FIN ACK,FIN -j DROP
+iptables -A OUTPUT ! -o lo ! -d 127.0.0.1 ! -s 127.0.0.1 -p tcp -m tcp --tcp-flags ACK,RST ACK,RST -j DROP
+
+#allow only Tor output
+for _uid_to_pass in $_uid_arr; do
+    iptables -A OUTPUT -m owner --uid-owner $_uid_to_pass -j ACCEPT
+done
+iptables -A OUTPUT -j REJECT
+
+# allow I2P port input
+iptables -I INPUT -i $_out_if -m multiport -p tcp --destination-ports $_i2p_port -j ACCEPT
+iptables -I INPUT -i $_out_if -m multiport -p udp --destination-ports $_i2p_port -j ACCEPT
+iptables -I INPUT -i $_out_if -m multiport -p sctp --destination-ports $_i2p_port -j ACCEPT
+
+# allow Tor port input
+iptables -I INPUT -i $_out_if -m multiport -p tcp --destination-ports $_tor_port -j ACCEPT
+iptables -I INPUT -i $_out_if -m multiport -p sctp --destination-ports $_tor_port -j ACCEPT
+
+exit 0
